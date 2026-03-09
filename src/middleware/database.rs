@@ -1,37 +1,39 @@
-use rbatis::rbatis::Rbatis;
 use std::sync::Arc;
-use crate::{Result, CrabotError};
-use crate::database::schema;
+use anyhow::Error;
+use rbatis::RBatis;
+use rbdc_mysql::driver::MysqlDriver;
+use tokio::sync::OnceCell;
+
+use crate::biz_err;
+
+static DATABASE: OnceCell<Arc<Database>> = OnceCell::const_new();
 
 /// 数据库中间件，负责数据库连接和初始化
-pub struct DatabaseMiddleware {
-    rb: Arc<Rbatis>,
+pub struct Database {
+    rb: Arc<RBatis>,
 }
 
-impl DatabaseMiddleware {
+impl Database {
     /// 初始化数据库连接池
-    pub async fn new(database_url: &str) -> Result<Self> {
-        let rb = Rbatis::new();
-        rb.link(database_url).await.map_err(|e| CrabotError::DatabaseError(e.to_string()))?;
-
+    pub async fn new(database_url: &str) -> Result<Self, Error> {
+        let rb = rbatis::RBatis::new();
+        rb.link(MysqlDriver{}, database_url).await.map_err(|e| biz_err!(e.to_string()))?;
         Ok(Self { rb: Arc::new(rb) })
     }
 
-    /// 初始化数据库表结构
-    pub async fn init_schema(&self) -> Result<()> {
-        let sql = schema::get_init_sql();
-        // 分割SQL语句并执行
-        for statement in sql.split(';') {
-            let trimmed = statement.trim();
-            if !trimmed.is_empty() && !trimmed.starts_with("--") {
-                self.rb.exec("", trimmed).await.map_err(|e| CrabotError::DatabaseError(format!("Failed to execute schema: {}", e)))?;
-            }
-        }
-        Ok(())
+    /// 获取Rbatis实例
+    pub fn rb(&self) -> &RBatis {
+        &self.rb
+    }
+}
+
+impl Database {
+    pub async fn init(database_url: &str) -> Result<(), Error> {
+        let database = Database::new(database_url).await?;
+        DATABASE.set(Arc::new(database)).map_err(|e|biz_err!(e.to_string()))
     }
 
-    /// 获取Rbatis实例
-    pub fn rb(&self) -> &Rbatis {
-        &self.rb
+    pub async fn get() -> Option<Arc<Database>> {
+        DATABASE.get().map(|d|d.clone())
     }
 }
