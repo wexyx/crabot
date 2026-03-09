@@ -22,18 +22,17 @@ impl Database {
     }
 
     /// 获取Rbatis实例
-    pub fn rb(&self) -> &RBatis {
-        &self.rb
+    pub fn client(&self) -> Arc<RBatis> {
+        self.rb.clone()
     }
 }
 
-impl Database {
-    pub async fn init(database_url: &str) -> Result<(), Error> {
-        let database = Database::new(database_url).await?;
-        DATABASE.set(Arc::new(database)).map_err(|e|biz_err!(e.to_string()))
-    }
+pub async fn init(database_url: &str) -> Result<(), Error> {
+    let database = Database::new(database_url).await?;
+    DATABASE.set(Arc::new(database)).map_err(|e|biz_err!(e.to_string()))
+}
 
-    pub async fn get() -> Option<Arc<Database>> {
-        DATABASE.get().map(|d|d.clone())
-    }
+pub fn instance() -> Result<Arc<Database>, Error> {
+    DATABASE.get().map(|d|d.clone()).ok_or(biz_err!("database not found"))
+
 }
