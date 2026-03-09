@@ -1,0 +1,26 @@
+[package]
+name = "ai"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+derive = { path = "../derive" }
+common = { path = "../common" }
+
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+inventory.workspace = true
+futures.workspace = true
+tokio.workspace = true
+log.workspace = true
+
+openai-api-rs = { git = "https://github.com/wexyx/openai-api-rs", branch = "main" }
+memvid-core = "2.0"
+async-recursion = "*"
+
+[lib]
+name = "ai"
+path = "src/lib.rs"

@@ -1,5 +1,3 @@
-# crabot
-
 ## 概述
 
 `crabot` 是一个基于公司组织架构的多智能体（AI Agent）系统。  

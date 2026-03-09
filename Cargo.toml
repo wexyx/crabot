@@ -1,0 +1,45 @@
+
+
+[package]
+name = "crabot"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["ai", "common", "derive"]
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.108"
+anyhow = "1.0.102"
+fast_log = "1.6"
+log = "0.4"
+env_logger = "0.11"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+async-trait = "0.1"
+inventory = "0.3"
+futures = "0.3.32"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+fast_log.workspace = true
+log.workspace = true
+env_logger.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+
+ai = { path = "./ai" }
+
+rbs = { version = "4"}
+rbatis = { version = "4.7"}
+rbdc-mysql = { version = "4.7" }
+
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+

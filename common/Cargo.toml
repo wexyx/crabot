@@ -1,0 +1,22 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+once_cell = "1.21.3"
+openai-api-rs = { git = "https://github.com/wexyx/openai-api-rs", branch = "main" }
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+fast_log.workspace = true
+log.workspace = true
+env_logger.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+inventory.workspace = true
+
