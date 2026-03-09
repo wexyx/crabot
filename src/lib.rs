@@ -2,6 +2,7 @@
 pub mod models;
 pub mod services;
 pub mod database;
+pub mod middleware;
 pub mod error;
 
 pub use error::{Result, CrabotError};

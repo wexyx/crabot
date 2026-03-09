@@ -1,24 +1,23 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use crate::models::Employee;
+use rbatis::crud_table;
 
 /// 部门类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "VARCHAR")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DepartmentType {
     #[serde(rename = "hr")]
     HR = 1,
-    
+
     #[serde(rename = "sales")]
     Sales = 2,
-    
+
     #[serde(rename = "engineering")]
     Engineering = 3,
-    
+
     #[serde(rename = "operations")]
     Operations = 4,
-    
+
     #[serde(rename = "marketing")]
     Marketing = 5,
 }
@@ -49,52 +48,64 @@ impl From<String> for DepartmentType {
 }
 
 /// 部门结构
+#[crud_table]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Department {
-    pub id: Uuid,
-    pub name: String,
-    pub dept_type: DepartmentType,
-    pub leader_id: Option<Uuid>, // 部门leader
-    pub parent_dept_id: Option<Uuid>, // 父部门ID
-    pub employee_count: u32,
-    pub created_at: DateTime<Utc>,
-    pub description: String,
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub dept_type: Option<String>,
+    pub leader_id: Option<String>,
+    pub parent_dept_id: Option<String>,
+    pub employee_count: Option<u32>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub description: Option<String>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl Department {
     pub fn new(name: String, dept_type: DepartmentType, description: String) -> Self {
         Self {
-            id: Uuid::new_v4(),
-            name,
-            dept_type,
+            id: Some(Uuid::new_v4().to_string()),
+            name: Some(name),
+            dept_type: Some(dept_type.to_string()),
             leader_id: None,
             parent_dept_id: None,
-            employee_count: 0,
-            created_at: Utc::now(),
-            description,
+            employee_count: Some(0),
+            created_at: Some(Utc::now()),
+            description: Some(description),
+            updated_at: Some(Utc::now()),
         }
+    }
+
+    /// 获取类型枚举
+    pub fn get_type_enum(&self) -> DepartmentType {
+        self.dept_type.as_ref().map(|t| DepartmentType::from(t.clone())).unwrap_or(DepartmentType::Operations)
     }
 
     /// 设置部门leader
     pub fn set_leader(&mut self, leader_id: Uuid) {
-        self.leader_id = Some(leader_id);
+        self.leader_id = Some(leader_id.to_string());
     }
 
     /// 添加员工
     pub fn add_employee(&mut self) {
-        self.employee_count += 1;
+        if let Some(ref mut count) = self.employee_count {
+            *count += 1;
+        }
     }
 
     /// 移除员工
     pub fn remove_employee(&mut self) {
-        if self.employee_count > 0 {
-            self.employee_count -= 1;
+        if let Some(ref mut count) = self.employee_count {
+            if *count > 0 {
+                *count -= 1;
+            }
         }
     }
 
     /// 获取部门的关键技能需求
     pub fn get_required_skills(&self) -> Vec<(String, crate::models::SkillLevel)> {
-        match self.dept_type {
+        match self.get_type_enum() {
             DepartmentType::HR => vec![
                 ("招聘".to_string(), crate::models::SkillLevel::Intermediate),
                 ("员工管理".to_string(), crate::models::SkillLevel::Intermediate),
