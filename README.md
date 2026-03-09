@@ -15,6 +15,7 @@
 ---
 
 ## 系统架构
+```
 Company
 ├ Departments
 │ ├ Research
@@ -25,6 +26,7 @@ Company
 │ └ Scheduled Tasks & Tools
 ├ Employees / Skills
 └ External Agents / Consultants
+```
 
 ### AI Agent 分类
 
