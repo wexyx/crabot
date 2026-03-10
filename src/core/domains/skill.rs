@@ -6,7 +6,7 @@ pub struct Skill {
 
     pub name: String,
     pub summary: String,
-    pub input: String,
-    pub output: String,
-    pub skill: String,
+    pub input: String,  // 输入的schema
+    pub output: String, // 输出的描述
+    pub skill: String,  // 具体的skill实现，可能是一个函数调用，也可能是调用llm进行逻辑处理
 }

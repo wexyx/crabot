@@ -7,7 +7,7 @@ pub struct Job {
 
     pub session_id: u64,
     pub message_id: u64,
-    pub dag: String,
+    pub dag: String, // 是skill的执行逻辑，其本质就是skill的dag
 
     pub last_at: DateTime,
     pub next_at: DateTime,
