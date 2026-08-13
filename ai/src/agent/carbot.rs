@@ -1,9 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
 use anyhow::{Error, Ok};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-use common::{biz_err, task};
+use common::biz_err;
 use futures::lock::Mutex;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::agent::{agent::Agent, model::Requirement};
 
@@ -52,14 +52,17 @@ impl Carbot {
 impl Agent for Carbot {
     async fn start(self: Arc<Self>) -> Result<String, Error> {
         if !self.check_can_run().await {
-            return Err(biz_err!("carbot already running"))
+            return Err(biz_err!("carbot already running"));
         }
 
         let result = self.delegate.run(self.clone()).await?;
         Ok(result)
     }
 
-    async fn find_requirements(&self, requirements: Vec<Requirement>)-> Result<HashMap<String, String>, Error> {
+    async fn find_requirements(
+        &self,
+        requirements: Vec<Requirement>,
+    ) -> Result<HashMap<String, String>, Error> {
         let mut miss_requirements = vec![];
         let mut result = HashMap::new();
         for requirement in requirements {

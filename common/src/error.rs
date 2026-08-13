@@ -1,4 +1,4 @@
-use std::{fmt::{Display, Formatter}};
+use std::fmt::{Display, Formatter};
 
 /// 业务错误+错误的调用链路
 #[macro_export]
@@ -17,9 +17,7 @@ macro_rules! biz_err {
 /// 追加调用链路
 #[macro_export]
 macro_rules! trace_err {
-    ($e:expr) => {{
-        $e.context(format!("{}:{}", file!(), line!()))
-    }};
+    ($e:expr) => {{ $e.context(format!("{}:{}", file!(), line!())) }};
 }
 
 pub struct Error {

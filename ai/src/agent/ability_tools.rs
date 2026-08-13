@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{Error};
+use anyhow::Error;
 use async_trait::async_trait;
 use common::{biz_err, tool::ToolSchema};
 use futures::lock::Mutex;
@@ -13,7 +13,9 @@ pub struct Factory {
 
 impl Factory {
     pub fn new() -> Self {
-        Self { data: Mutex::new(Default::default()) }
+        Self {
+            data: Mutex::new(Default::default()),
+        }
     }
 }
 
@@ -31,7 +33,7 @@ impl AbilityFactory for Factory {
         Ok(schemas)
     }
 
-    async fn tool(&self, name: &str, ) -> Result<ToolSchema, Error> {
+    async fn tool(&self, name: &str) -> Result<ToolSchema, Error> {
         let data = self.data.lock().await;
         let schema = data.get(name).ok_or(biz_err!("tool not found"))?;
         Ok(schema.clone())

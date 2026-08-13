@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Type};
+use syn::{DeriveInput, Type, parse_macro_input};
 
 use darling::{FromDeriveInput, FromField};
 
@@ -59,8 +59,7 @@ fn parse_type(ty: &Type) -> (String, bool, bool) {
 pub fn impl_derive_schema(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let receiver = SchemeStruct::from_derive_input(&input)
-        .expect("Failed to parse struct");
+    let receiver = SchemeStruct::from_derive_input(&input).expect("Failed to parse struct");
 
     let struct_name = &receiver.ident;
     let fields = match receiver.data {
@@ -122,6 +121,5 @@ pub fn impl_derive_schema(input: TokenStream) -> TokenStream {
         }
     };
 
-    println!("Scheme gen: {}", expanded);
     TokenStream::from(expanded)
 }

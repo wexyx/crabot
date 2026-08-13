@@ -9,13 +9,17 @@ pub async fn call(name: &str, params: &str) -> Result<String, Error> {
     }
     log::info!("tool calling name: {}, params: {}", name, params);
     let factory = common::registry::factory::<String, Box<dyn common::tool::Tool>>()?;
-    let tool = factory.create(name, params.to_string()).ok_or(anyhow::Error::msg("tool not found"))?;
+    let tool = factory
+        .create(name, params.to_string())
+        .ok_or(anyhow::Error::msg("tool not found"))?;
     tool.run().await
 }
 
 pub async fn schema(name: &str) -> Result<ToolSchema, Error> {
     let factory = common::registry::factory::<String, Box<dyn common::tool::Tool>>()?;
-    let tool = factory.create(name, "{}".to_string()).ok_or(anyhow::Error::msg("tool not found"))?;
+    let tool = factory
+        .create(name, "{}".to_string())
+        .ok_or(anyhow::Error::msg("tool not found"))?;
     Ok(tool.schema().await)
 }
 

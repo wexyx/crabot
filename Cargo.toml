@@ -6,7 +6,19 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["ai", "common", "derive"]
+members = [
+    "ai",
+    "common",
+    "derive",
+    "crates/domain",
+    "crates/runtime",
+    "crates/skills",
+    "crates/plugins",
+    "crates/mcp",
+    "crates/storage",
+    "crates/api",
+]
+resolver = "2"
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -21,6 +33,9 @@ thiserror = "1.0"
 async-trait = "0.1"
 inventory = "0.3"
 futures = "0.3.32"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
 
 [dependencies]
 tokio.workspace = true
@@ -33,13 +48,16 @@ log.workspace = true
 env_logger.workspace = true
 chrono.workspace = true
 async-trait.workspace = true
+uuid.workspace = true
 
 ai = { path = "./ai" }
+crabot-domain = { path = "./crates/domain" }
+crabot-runtime = { path = "./crates/runtime" }
+crabot-skills = { path = "./crates/skills" }
+crabot-plugins = { path = "./crates/plugins" }
+crabot-mcp = { path = "./crates/mcp" }
 
 rbs = { version = "4"}
 rbatis = { version = "4.7"}
 rbdc-mysql = { version = "4.7" }
-
-uuid = { version = "1.0", features = ["v4", "serde"] }
-
 

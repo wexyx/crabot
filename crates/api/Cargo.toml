@@ -1,0 +1,18 @@
+[package]
+name = "crabot-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+chrono.workspace = true
+crabot-domain = { path = "../domain" }
+crabot-runtime = { path = "../runtime" }
+crabot-storage = { path = "../storage" }
+env_logger.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+uuid.workspace = true

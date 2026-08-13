@@ -1,15 +1,20 @@
 use anyhow::Error;
 use async_recursion::async_recursion;
-use common::task;
-use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, chat_completion::ChatCompletionRequest};
-use std::{collections::HashMap, sync::Arc, time::Duration};
 use async_trait::async_trait;
+use common::task;
 use futures::lock::Mutex;
-use openai_api_rs::v1::{chat_completion::{ChatCompletionChoice, Content, MessageRole, Tool, ToolCall}};
+use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, Content, MessageRole, Tool};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::{agent::{ability::AbilityFactory, agent::Agent, carbot::Carbot, common::request_for_plan, constant::PLANNER_PROMPT, model::{NodeInfo, PlanInfo}}, client::openai, tools};
+use crate::{
+    agent::{
+        ability::AbilityFactory, agent::Agent, common::request_for_plan, constant::PLANNER_PROMPT,
+        model::NodeInfo,
+    },
+    tools,
+};
 
-use crate::agent::{carbot::CarbotDelegate};
+use crate::agent::carbot::CarbotDelegate;
 
 pub struct Planner {
     node: Mutex<NodeInfo>,
@@ -19,10 +24,10 @@ pub struct Planner {
 
 impl Planner {
     pub fn new(node: NodeInfo, ability: Arc<Box<dyn AbilityFactory>>) -> Self {
-        Self { 
+        Self {
             node: Mutex::new(node),
             ability,
-            results: Mutex::new(Default::default())
+            results: Mutex::new(Default::default()),
         }
     }
 }
@@ -33,7 +38,7 @@ impl CarbotDelegate for Planner {
         for _ in 0..20 {
             let finish = self.do_plan(carbot.clone()).await?;
             if finish {
-                break ;
+                break;
             }
         }
 
@@ -53,7 +58,7 @@ impl Planner {
     async fn do_plan(&self, carbot: Arc<crate::agent::carbot::Carbot>) -> Result<bool, Error> {
         let node = self.node().await?;
         let requirements = carbot.find_requirements(node.requirements).await?;
-        
+
         let plan_info = request_for_plan(self.messages(requirements).await?).await?;
         if plan_info.is_none() {
             return Ok(true);
@@ -64,7 +69,7 @@ impl Planner {
             if let Some(plan_result) = plan_info.result {
                 self.append_result(plan_result).await;
             }
-            
+
             return Ok(true);
         }
 
@@ -73,9 +78,7 @@ impl Planner {
             for node in nodes {
                 let child = self.ability.create_carbot(carbot.clone(), node).await?;
                 let child = Arc::new(child);
-                futures.push(task::spawn_result(async move {
-                    child.start().await
-                }));
+                futures.push(task::spawn_result(async move { child.start().await }));
             }
         }
 
@@ -97,7 +100,7 @@ impl Planner {
     async fn tools(&self) -> Result<Vec<Tool>, Error> {
         let mut tools = Vec::new();
         for schema in tools::list().await? {
-            let tool : Result<Tool, Error> = schema.into();
+            let tool: Result<Tool, Error> = schema.into();
             tools.push(tool?);
         }
 
@@ -121,21 +124,25 @@ impl Planner {
         results.clone()
     }
 
-    async fn messages(&self, params: HashMap<String, String>) -> Result<Vec<ChatCompletionMessage>, Error> {
-        let mut data = vec![ChatCompletionMessage {
+    async fn messages(
+        &self,
+        params: HashMap<String, String>,
+    ) -> Result<Vec<ChatCompletionMessage>, Error> {
+        let mut data = vec![
+            ChatCompletionMessage {
                 role: MessageRole::system,
                 content: Content::Text(PLANNER_PROMPT.to_string()),
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
-            }, 
+            },
             ChatCompletionMessage {
                 role: MessageRole::assistant,
                 content: Content::Text(self.node.lock().await.goal.clone()),
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
-            }
+            },
         ];
 
         let tools = self.tools().await?;

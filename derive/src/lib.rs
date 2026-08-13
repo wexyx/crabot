@@ -1,6 +1,6 @@
-mod tool;
-mod schema;
 mod common;
+mod schema;
+mod tool;
 
 extern crate proc_macro;
 

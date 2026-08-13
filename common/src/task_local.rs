@@ -1,5 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, hash::Hash, sync::{Arc, RwLock}};
 use std::any::Any;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    hash::Hash,
+    sync::{Arc, RwLock},
+};
 use tokio::task_local;
 
 task_local! {
@@ -16,13 +21,9 @@ pub fn get_task_local() -> Arc<TaskLocal> {
         b.borrow().as_ref().unwrap().clone()
     });
 
-    let r= match data {
-        Ok(result) => {
-            result
-        },
-        Err(_err) => {
-            Arc::new(TaskLocal::new())
-        }
+    let r = match data {
+        Ok(result) => result,
+        Err(_err) => Arc::new(TaskLocal::new()),
     };
 
     r
@@ -41,13 +42,13 @@ pub fn get<T: 'static + Clone + Send + Sync>(key: &str) -> Option<T> {
 /// 当前不是标准的task_local，目前所有的异步任务共享同一个TaskLocal实例，即：子任务写入的数据也能被父任务读取。
 /// 后续可以考虑改成Copy或者链表形式，解决父子数据复制，以及子任务数据隔离问题
 pub struct TaskLocal {
-    data: TaskLocalData<String, Box<dyn Any + Send + Sync>>
+    data: TaskLocalData<String, Box<dyn Any + Send + Sync>>,
 }
 
 impl TaskLocal {
     fn new() -> Self {
-        Self { 
-            data: TaskLocalData::new()
+        Self {
+            data: TaskLocalData::new(),
         }
     }
 
@@ -62,38 +63,39 @@ impl TaskLocal {
 }
 
 struct TaskLocalData<K: Eq + Hash, V> {
-    data: RwLock<HashMap<K, Arc<V>>>
+    data: RwLock<HashMap<K, Arc<V>>>,
 }
 
-impl <K: Eq + Hash, V> TaskLocalData<K, V> {
+impl<K: Eq + Hash, V> TaskLocalData<K, V> {
     pub fn new() -> Self {
         return Self {
-            data: Default::default()
+            data: Default::default(),
         };
     }
 
     pub fn set(&self, k: K, v: Arc<V>) {
-        let mut data =self.data.write().unwrap();
+        let mut data = self.data.write().unwrap();
         data.insert(k, v);
     }
 
     pub fn get(&self, k: &K) -> Option<Arc<V>> {
-        let data =self.data.read().unwrap();
+        let data = self.data.read().unwrap();
         let v = data.get(k);
         v.cloned()
     }
 
+    #[allow(dead_code)]
     pub fn remove(&self, k: &K) {
-        let mut data =self.data.write().unwrap();
+        let mut data = self.data.write().unwrap();
         data.remove(k);
     }
 
+    #[allow(dead_code)]
     pub fn clear(&self) {
-        let mut data =self.data.write().unwrap();
+        let mut data = self.data.write().unwrap();
         data.clear();
     }
 }
-
 
 #[cfg(test)]
 mod tests {

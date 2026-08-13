@@ -1,8 +1,8 @@
+use crate::factory::TypedBeanFactory;
+use crate::inventory::FactoryRegistration;
 use std::any::{Any, TypeId, type_name};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use crate::factory::TypedBeanFactory;
-use crate::inventory::FactoryRegistration;
 
 use anyhow::Error;
 use once_cell::sync::Lazy;
@@ -15,17 +15,42 @@ pub fn register() {
     }
 }
 
-pub fn create<I, O>(bean: &str, input: I) -> Result<O, Error> where I: 'static, O: 'static {
-    let factory = BEAN_REGISTRY.get_factory::<I, O>()
-        .ok_or(anyhow::Error::msg(format!("factory not found: {}_{}", type_name::<I>(), type_name::<O>())))?;
+pub fn create<I, O>(bean: &str, input: I) -> Result<O, Error>
+where
+    I: 'static,
+    O: 'static,
+{
+    let factory = BEAN_REGISTRY
+        .get_factory::<I, O>()
+        .ok_or(anyhow::Error::msg(format!(
+            "factory not found: {}_{}",
+            type_name::<I>(),
+            type_name::<O>()
+        )))?;
 
-    let demo = factory.create(bean, input).ok_or(anyhow::Error::msg(format!("bean: {} not found: {}_{}", bean, type_name::<I>(), type_name::<O>())))?;
+    let demo = factory
+        .create(bean, input)
+        .ok_or(anyhow::Error::msg(format!(
+            "bean: {} not found: {}_{}",
+            bean,
+            type_name::<I>(),
+            type_name::<O>()
+        )))?;
     Ok(demo)
 }
 
-pub fn factory<I, O>() -> Result<Arc<TypedBeanFactory<I, O>>, Error> where I: 'static, O: 'static {
-    let factory = BEAN_REGISTRY.get_factory::<I, O>()
-        .ok_or(anyhow::Error::msg(format!("factory not found: {}_{}", type_name::<I>(), type_name::<O>())))?;
+pub fn factory<I, O>() -> Result<Arc<TypedBeanFactory<I, O>>, Error>
+where
+    I: 'static,
+    O: 'static,
+{
+    let factory = BEAN_REGISTRY
+        .get_factory::<I, O>()
+        .ok_or(anyhow::Error::msg(format!(
+            "factory not found: {}_{}",
+            type_name::<I>(),
+            type_name::<O>()
+        )))?;
     Ok(factory.clone())
 }
 
@@ -41,21 +66,19 @@ impl AnyBeanRegistry {
     }
 
     pub fn init_factory<I: 'static, O: 'static>(&self) -> Option<Arc<TypedBeanFactory<I, O>>> {
-        println!("AnyBeanRegistry register factory: {:?}", TypeId::of::<(I, O)>());
-        let factory = self.factories
+        let factory = self
+            .factories
             .write()
             .unwrap()
             .entry(TypeId::of::<(I, O)>())
-            .or_insert_with(|| {
-                Arc::new(TypedBeanFactory::<I, O>::new())
-            })
+            .or_insert_with(|| Arc::new(TypedBeanFactory::<I, O>::new()))
             .clone();
- 
+
         let result = factory.downcast::<TypedBeanFactory<I, O>>();
         match result {
             Ok(r) => {
                 return Some(r);
-            },
+            }
             Err(_) => {
                 return None;
             }
@@ -69,7 +92,7 @@ impl AnyBeanRegistry {
             match result {
                 Ok(r) => {
                     return Some(r);
-                },
+                }
                 Err(_) => {
                     return None;
                 }

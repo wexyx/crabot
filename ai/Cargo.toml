@@ -6,6 +6,9 @@ edition = "2024"
 [dependencies]
 derive = { path = "../derive" }
 common = { path = "../common" }
+crabot-skills = { path = "../crates/skills" }
+crabot-mcp = { path = "../crates/mcp" }
+crabot-domain = { path = "../crates/domain" }
 
 serde.workspace = true
 serde_json.workspace = true

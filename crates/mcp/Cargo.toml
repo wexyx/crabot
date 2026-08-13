@@ -1,0 +1,9 @@
+[package]
+name = "crabot-mcp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crabot-domain = { path = "../domain" }
+serde.workspace = true
+serde_json.workspace = true

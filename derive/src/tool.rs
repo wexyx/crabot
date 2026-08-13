@@ -1,12 +1,10 @@
-use darling::ast::NestedMeta;
 use darling::FromMeta;
+use darling::ast::NestedMeta;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use std::{any::Any, fmt::Debug};
-use syn::{FnArg, GenericArgument, ItemFn, Pat, PatIdent, PatType, PathArguments, ReturnType, Type, parse_macro_input};
+use syn::{FnArg, ItemFn, PatType, Type, parse_macro_input};
 
 use crate::common::generate_output_type;
-
 
 #[derive(Default, Debug, FromMeta, Clone)]
 struct Config {
@@ -15,12 +13,6 @@ struct Config {
 
     #[darling(default)]
     desc: String,
-}
-
-struct InputParam {
-    name: String,
-    ty: Type,
-    is_option: bool,
 }
 
 pub fn impl_tool_function(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -62,26 +54,25 @@ pub fn impl_tool_function(attr: TokenStream, item: TokenStream) -> TokenStream {
         panic!("require input args")
     }
 
-    let output = func.sig.output.clone();
     let input_ty: Type = match func.sig.inputs.first() {
         Some(FnArg::Typed(PatType { ty, .. })) => *(*ty).clone(),
-        _ => panic!("require input args"), 
+        _ => panic!("require input args"),
     };
 
     // 取返回类型作为 Output
     let output_ty = output_info.ty;
 
-    let ctor_ident = format_ident!(
-        "{}__bean_constructor__", &tool_struct,
-    );
-   
+    let ctor_ident = format_ident!("{}__bean_constructor__", &tool_struct,);
+
     let expanded = quote! {
         #func
 
+        #[allow(non_camel_case_types)]
         pub struct #tool_struct {
             data: String,
         }
 
+        #[allow(non_camel_case_types)]
         pub struct #ctor_ident;
 
         impl common::constructor::Constructor<String, Box<dyn common::tool::Tool>> for #ctor_ident {
@@ -116,6 +107,7 @@ pub fn impl_tool_function(attr: TokenStream, item: TokenStream) -> TokenStream {
                     desc: #tool_desc.to_string(),
                     input: #input_ty::into_schema(),
                     output: #output_ty::into_schema(),
+                    metadata: common::tool::CapabilityMetadata::default(),
                 }
             }
 
@@ -128,6 +120,5 @@ pub fn impl_tool_function(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    println!("ToolFunction gen: {}", expanded);
     expanded.into()
 }

@@ -147,8 +147,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::task_local;
     use super::*;
+    use crate::task_local;
     #[tokio::test]
     async fn test_task_local() {
         let r = spawn(async {
@@ -162,15 +162,21 @@ mod tests {
 
                 let hello_world222 = task_local::get::<String>("hello_world222");
                 assert!(hello_world222.is_some());
-                assert!(hello_world222.unwrap_or_default().eq("hello_world222_jjjjj"));
-            }).await;
+                assert!(
+                    hello_world222
+                        .unwrap_or_default()
+                        .eq("hello_world222_jjjjj")
+                );
+            })
+            .await;
 
             assert!(r2.is_ok());
 
             // 当前特性，子任务数据也能被父任务读取到，内部采用读写锁，所以线程安全
             let hello_world222 = task_local::get::<String>("hello_world222");
             assert!(hello_world222.is_some());
-        }).await;
+        })
+        .await;
 
         assert!(r.is_ok());
     }

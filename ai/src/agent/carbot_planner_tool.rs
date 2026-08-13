@@ -1,13 +1,15 @@
 use anyhow::{Error, Ok};
-use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, chat_completion::ChatCompletionRequest};
-use std::{collections::HashMap, hash::Hash, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use futures::lock::Mutex;
-use openai_api_rs::v1::{chat_completion::{ChatCompletionChoice, Content, MessageRole, ToolCall}};
+use openai_api_rs::v1::chat_completion::{ChatCompletionMessage, Content, MessageRole};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::{agent::{ability::AbilityFactory, agent::Agent, carbot::Carbot, common::{load_tool_calling_info}, constant::{PLANNER_PROMPT, TOOL_PROMPT}, model::{NodeInfo, PlanInfo}}, client::openai, tools};
+use crate::{
+    agent::{agent::Agent, common::load_tool_calling_info, constant::TOOL_PROMPT, model::NodeInfo},
+    tools,
+};
 
-use crate::agent::{carbot::CarbotDelegate};
+use crate::agent::carbot::CarbotDelegate;
 
 pub struct ToolCaller {
     node: Mutex<NodeInfo>,
@@ -15,7 +17,7 @@ pub struct ToolCaller {
 
 impl ToolCaller {
     pub fn new(node: NodeInfo) -> Self {
-        Self { 
+        Self {
             node: Mutex::new(node),
         }
     }
@@ -28,7 +30,8 @@ impl CarbotDelegate for ToolCaller {
         let node = self.node().await?;
         log::error!("CarbotDelegate find requirements: {:?}", node.requirements);
         let mut requirements = carbot.find_requirements(node.requirements).await?;
-        let toolcall_info = load_tool_calling_info(self.messages(requirements.clone()).await, tool.clone()).await?;
+        let toolcall_info =
+            load_tool_calling_info(self.messages(requirements.clone()).await, tool.clone()).await?;
 
         if toolcall_info.is_none() {
             return Ok("".to_string());
@@ -46,7 +49,8 @@ impl CarbotDelegate for ToolCaller {
                 requirements.insert(k, v);
             }
 
-            let toolcall_info = load_tool_calling_info(self.messages(requirements).await, tool.clone()).await?;
+            let toolcall_info =
+                load_tool_calling_info(self.messages(requirements).await, tool.clone()).await?;
             if toolcall_info.is_none() {
                 return Ok("".to_string());
             }
@@ -76,35 +80,38 @@ impl ToolCaller {
 
 impl ToolCaller {
     async fn messages(&self, params: HashMap<String, String>) -> Vec<ChatCompletionMessage> {
-        let mut data = vec![ChatCompletionMessage {
-            role: MessageRole::system,
-            content: Content::Text(TOOL_PROMPT.to_string()),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        }, ChatCompletionMessage {
-            role: MessageRole::assistant,
-            content: Content::Text(self.node.lock().await.goal.clone()),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        }];
+        let mut data = vec![
+            ChatCompletionMessage {
+                role: MessageRole::system,
+                content: Content::Text(TOOL_PROMPT.to_string()),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            ChatCompletionMessage {
+                role: MessageRole::assistant,
+                content: Content::Text(self.node.lock().await.goal.clone()),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            },
+        ];
 
         if params.len() > 0 {
             data.push(ChatCompletionMessage {
-            role: MessageRole::assistant,
-            content: Content::Text(serde_json::to_string(&params).unwrap_or_default()),
-            name: None,
-            tool_calls: None,
-            tool_call_id: None,
-        });
+                role: MessageRole::assistant,
+                content: Content::Text(serde_json::to_string(&params).unwrap_or_default()),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            });
         }
 
         data
     }
- 
+
     async fn call_tool(&self, name: &str, params: String) -> Result<String, Error> {
         let result = tools::call(&name, &params).await?;
-        return Ok(result)
+        return Ok(result);
     }
 }

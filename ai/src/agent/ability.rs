@@ -8,7 +8,7 @@ use crate::agent::{carbot::Carbot, model::NodeInfo};
 
 /// 这里的tool可以是function_calling也可以是mcp的接口，也可以是mcp，实际上就是进行分类
 #[async_trait]
-pub trait AbilityFactory: Send + Sync +  {
+pub trait AbilityFactory: Send + Sync {
     // 注册新的工具进去
     async fn register(&self, tool: ToolSchema);
     // 所有的工具

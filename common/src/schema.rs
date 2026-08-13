@@ -1,6 +1,6 @@
-use std::fmt::Display;
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 pub trait SchemaParams {
     fn into_schema() -> Schema;
@@ -13,16 +13,17 @@ pub struct Schema {
 
 impl Schema {
     pub fn new(data: serde_json::Value) -> Self {
-        Self {
-            data,
-        }
+        Self { data }
     }
 }
 
 impl Display for Schema {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let params : Result<openai_api_rs::v1::types::FunctionParameters, Error> = self.clone().into();
-        let data = params.map(|v|serde_json::to_string_pretty(&v).unwrap()).unwrap_or_else(|e|e.to_string());
+        let params: Result<openai_api_rs::v1::types::FunctionParameters, Error> =
+            self.clone().into();
+        let data = params
+            .map(|v| serde_json::to_string_pretty(&v).unwrap())
+            .unwrap_or_else(|e| e.to_string());
         f.write_str(data.as_str())
     }
 }
@@ -35,12 +36,11 @@ impl From<Schema> for Result<openai_api_rs::v1::types::FunctionParameters, Error
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct Empty {
-}
+pub struct Empty {}
 
 impl Empty {
     pub fn new() -> Self {
-        Self {  }
+        Self {}
     }
 }
 

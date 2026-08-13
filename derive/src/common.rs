@@ -1,15 +1,9 @@
 use darling::FromMeta;
-use proc_macro::TokenStream;
 use quote::quote;
-use std::fmt::Debug;
-use syn::{
-    FnArg, Ident,
-    ItemFn, ReturnType,
-    Type, PathArguments, GenericArgument
-};
-
+use syn::{FnArg, GenericArgument, Ident, ItemFn, PathArguments, ReturnType, Type};
 
 #[derive(PartialEq, Debug)]
+#[allow(dead_code)]
 pub enum OutputType {
     Option,
     Result,
@@ -18,9 +12,10 @@ pub enum OutputType {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct OutputInfo {
-    pub ty: syn::Type,     // 最终真实类型（去掉 Result / Option）
-    pub is_option: bool,   // 是否是 Option
+    pub ty: syn::Type,   // 最终真实类型（去掉 Result / Option）
+    pub is_option: bool, // 是否是 Option
 }
 
 pub fn generate_output_type(item_fn: &ItemFn) -> OutputInfo {
@@ -56,6 +51,7 @@ pub fn generate_output_type(item_fn: &ItemFn) -> OutputInfo {
     }
 }
 
+#[allow(dead_code)]
 pub fn rename_origin_func(
     prefix: &str,
     struct_method: bool,
@@ -78,8 +74,7 @@ pub fn rename_origin_func(
     let mut input_args = Vec::new();
     for input in fn_sig.inputs.clone() {
         match input {
-            syn::FnArg::Receiver(r) => {
-            }
+            syn::FnArg::Receiver(_) => {}
             syn::FnArg::Typed(t) => {
                 input_args.push(t.pat.clone());
             }
@@ -114,6 +109,7 @@ pub fn rename_origin_func(
 }
 
 /// 简单驼峰转下划线函数
+#[allow(dead_code)]
 pub(super) fn to_snake_case(name: &str) -> String {
     let mut result = String::new();
     for (i, ch) in name.chars().enumerate() {

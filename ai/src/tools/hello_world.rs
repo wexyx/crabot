@@ -1,7 +1,7 @@
+use anyhow::Error;
+use common::schema::SchemaParams;
 use derive::{Scheme, tool_function};
 use serde::{Deserialize, Serialize};
-use common::schema::{Empty, SchemaParams};
-use anyhow::Error;
 
 #[derive(Scheme, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
@@ -17,9 +17,9 @@ pub struct HelloWorldResp {
     pub msg: String,
 }
 
-#[tool_function(desc="打印hello_world")]
-pub async fn print_hello_world(req: HelloWorldReq) -> Result<HelloWorldResp, Error> {
-    Ok(HelloWorldResp{
+#[tool_function(desc = "打印hello_world")]
+pub async fn print_hello_world(_req: HelloWorldReq) -> Result<HelloWorldResp, Error> {
+    Ok(HelloWorldResp {
         msg: "how are u".to_string(),
     })
 }

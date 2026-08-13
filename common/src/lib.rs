@@ -1,10 +1,10 @@
-pub mod schema;
-pub mod tool;
-pub mod inventory;
-pub mod registry;
 pub mod bean;
 pub mod constructor;
+pub mod error;
 pub mod factory;
+pub mod inventory;
+pub mod registry;
+pub mod schema;
 pub mod task;
 pub mod task_local;
-pub mod error;
+pub mod tool;

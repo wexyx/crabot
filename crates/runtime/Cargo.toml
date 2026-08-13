@@ -1,0 +1,16 @@
+[package]
+name = "crabot-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+crabot-domain = { path = "../domain" }
+crabot-mcp = { path = "../mcp" }
+crabot-plugins = { path = "../plugins" }
+crabot-skills = { path = "../skills" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

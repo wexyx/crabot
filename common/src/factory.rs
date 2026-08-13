@@ -14,12 +14,7 @@ impl<I: 'static, O: 'static> TypedBeanFactory<I, O> {
         }
     }
 
-    pub fn register(
-        &self,
-        name: &str,
-        ctor: Arc<dyn Constructor<I, O>>,
-    ) {
-        println!("TypedBeanFactory register bean: {}", name);
+    pub fn register(&self, name: &str, ctor: Arc<dyn Constructor<I, O>>) {
         self.constructors
             .write()
             .unwrap()
@@ -31,15 +26,11 @@ impl<I: 'static, O: 'static> TypedBeanFactory<I, O> {
             .read()
             .unwrap()
             .get(name)
-            .map(|c| {
-                c.create(input)
-            })
+            .map(|c| c.create(input))
     }
 
     pub fn constructors(&self) -> HashMap<String, Arc<dyn Constructor<I, O>>> {
-        let constructors = self.constructors
-            .read()
-            .unwrap();
+        let constructors = self.constructors.read().unwrap();
 
         let mut results = HashMap::new();
         for (key, constructor) in constructors.iter() {
