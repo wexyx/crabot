@@ -30,6 +30,8 @@ LadybugDB 的本地绑定需要支持 C++20 `<format>` 和 `std::atomic_ref` 的
 
 Release 工作流先编译并执行 `scripts/ci/cxx20-probe.cpp` 验证这两项能力，再构建 Rust。macOS 使用的 LadybugDB 预编译库版本从 `Cargo.lock` 读取，与打包的 FTS 扩展保持同版本，不跟随上游 `latest`；下载失败时依赖仍会回退到源码编译。
 
+Linux 构建容器显式安装 `perl-core`、`perl-IPC-Cmd` 和 Make，固定使用 `/usr/bin/perl`，并在正式编译前对锁定版本的 OpenSSL `Configure` 执行 `perl -c`，提前检查完整模块加载链。
+
 Linux 打包前通过 `scripts/ci/check-linux-libraries.sh` 检查主程序与 FTS 扩展：拒绝 OpenSSL 动态依赖、缺失库，以及超过 Debian 10 的 GLIBC 2.28 / GLIBCXX 3.4.25 / CXXABI 1.3.11 要求。随后在无网络的 Debian 10 容器中运行包内启动器，并检查扩展依赖。静态 OpenSSL 的安全更新需要更新 `Cargo.lock` 并重新发布程序，不能仅靠更新宿主机 OpenSSL。
 
 ```bash
