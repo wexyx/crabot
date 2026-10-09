@@ -12,9 +12,8 @@ export CC=gcc CXX=g++
 export LBUG_BUILD_FROM_SOURCE=1
 # Bound native compilation memory on hosted runners.
 export CARGO_BUILD_JOBS=2 CMAKE_BUILD_PARALLEL_LEVEL=2
-# Do not allow image defaults to override openssl-sys's vendored build.
-export OPENSSL_NO_VENDOR=0
-unset OPENSSL_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR
+# Rust and LadybugDB will use one static OpenSSL built below from locked sources.
+unset OPENSSL_DIR OPENSSL_ROOT_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR
 "$CXX" --version
 "$CXX" -std=c++20 scripts/ci/cxx20-probe.cpp -o /tmp/crabot-cxx20-probe
 /tmp/crabot-cxx20-probe
@@ -31,6 +30,15 @@ if len(packages) != 1:
     sys.exit("Expected exactly one locked openssl-src package")
 print(pathlib.Path(packages[0]["manifest_path"]).parent / "openssl" / "Configure")')
 "$OPENSSL_SRC_PERL" -c "$openssl_configure"
+export OPENSSL_DIR="$PWD/target/native-openssl/install"
+bash scripts/ci/build-static-openssl.sh "$target" "$openssl_configure" "$OPENSSL_DIR"
+export OPENSSL_ROOT_DIR="$OPENSSL_DIR" OPENSSL_STATIC=1 OPENSSL_NO_VENDOR=1
+export CMAKE_TOOLCHAIN_FILE="$PWD/scripts/ci/linux-release-toolchain.cmake"
+cmake -S scripts/ci/openssl-probe -B target/openssl-probe \
+  -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE"
+cmake --build target/openssl-probe --parallel 2
+target/openssl-probe/crabot-openssl-probe
+bash scripts/ci/check-linux-libraries.sh target/openssl-probe/crabot-openssl-probe
 cargo +stable build --release --locked -p agent-node
 bash scripts/ci/check-linux-libraries.sh target/release/agent-node
 bash scripts/package-release.sh "$target"

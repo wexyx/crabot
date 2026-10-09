@@ -60,7 +60,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test scripts/linux-libraries.test.mjs
+      - run: node --test scripts/linux-libraries.test.mjs scripts/static-openssl.test.mjs
       - run: npm install --global pnpm@10
       - if: runner.os == 'macOS'
         run: rustup update stable --no-self-update

@@ -32,6 +32,8 @@ Release 工作流先编译并执行 `scripts/ci/cxx20-probe.cpp` 验证这两项
 
 Linux 构建容器显式安装 `perl-core`、`perl-IPC-Cmd` 和 Make，固定使用 `/usr/bin/perl`，并在正式编译前对锁定版本的 OpenSSL `Configure` 执行 `perl -c`，提前检查完整模块加载链。
 
+随后从 `Cargo.lock` 锁定的 `openssl-src` 构建静态 OpenSSL，统一提供给 `openssl-sys` 和 LadybugDB。`OPENSSL_NO_VENDOR=1` 仅在此 CI 流程中避免重复构建，配合 `OPENSSL_DIR` / `OPENSSL_STATIC=1` 使用准备好的静态库，不回退到系统动态库。CMake 工具链显式指定同一套头文件与 `.a` 库；正式编译前先运行 `scripts/ci/openssl-probe` 验证查找、链接及执行。
+
 Linux 打包前通过 `scripts/ci/check-linux-libraries.sh` 检查主程序与 FTS 扩展：拒绝 OpenSSL 动态依赖、缺失库，以及超过 Debian 10 的 GLIBC 2.28 / GLIBCXX 3.4.25 / CXXABI 1.3.11 要求。随后在无网络的 Debian 10 容器中运行包内启动器，并检查扩展依赖。静态 OpenSSL 的安全更新需要更新 `Cargo.lock` 并重新发布程序，不能仅靠更新宿主机 OpenSSL。
 
 ```bash
