@@ -21,24 +21,13 @@ pub(super) async fn subscribe(
     let baseline = if replay {
         0
     } else {
-        manager
-            .core()
-            .state()
-            .store
-            .logs()
-            .read(
-                project,
-                group
-                    .as_ref()
-                    .map(|g| format!("group:{g}"))
-                    .unwrap_or_else(|| "admin".into()),
-                0,
-                u64::MAX,
-                1,
-            )
-            .await
-            .ok()
-            .and_then(|rows| rows.last().and_then(|r| r["seq"].as_u64()))
+        let chat = group
+            .as_ref()
+            .map(|g| format!("group:{g}"))
+            .unwrap_or_else(|| "admin".into());
+        crate::storage::knowledge::for_project(project)
+            .and_then(|knowledge| crate::storage::knowledge::latest_seq(&knowledge, &chat).ok())
+            .flatten()
             .unwrap_or(0)
     };
     let task = tokio::spawn(async move {
@@ -50,20 +39,13 @@ pub(super) async fn subscribe(
         loop {
             if reload {
                 let result = if business {
-                    manager
-                        .core()
-                        .state()
-                        .store
-                        .logs()
-                        .read(
-                            project,
-                            format!("group:{}", group.as_deref().unwrap()),
-                            seen,
-                            u64::MAX,
-                            10000,
-                        )
+                    let chat = format!("group:{}", group.as_deref().unwrap());
+                    let history =
+                        crate::core::indexed_history::IndexedHistory::new(project, chat, None);
+                    history
+                        .rows(None, seen, u64::MAX, 10000)
                         .await
-                        .map(serde_json::Value::Array)
+                        .map(|(rows, _)| serde_json::Value::Array(rows))
                 } else {
                     manager
                         .history(project, id)

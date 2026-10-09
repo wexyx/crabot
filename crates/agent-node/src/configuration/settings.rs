@@ -10,11 +10,11 @@ const KEYS: &[&str] = &[
     "MODEL_API_KEY",
     "MODEL_BASE_URL",
     "MODEL_API",
+    "MODEL_SYSTEM_PROMPT",
     "HARNESS_MAX_TOKENS",
     "MODEL_THINKING",
     "MODEL_REASONING_EFFORT",
     "CONTEXT_MAX_TOKENS",
-    "CONTEXT_RECENT_TURNS",
     "CODEX_BIN",
     "CLAUDE_BIN",
     "OPENCODE_BIN",
@@ -40,7 +40,7 @@ impl Settings {
             if let Ok(value) = std::env::var(key) {
                 // Launcher dotenv values are defaults, not explicit operator overrides.
                 // A saved interactive configuration must survive stale/blank template files.
-                let defaults = std::env::var("CARBOT_CONFIG_DEFAULT_KEYS").unwrap_or_default();
+                let defaults = std::env::var("CRABOT_CONFIG_DEFAULT_KEYS").unwrap_or_default();
                 if defaults.split_whitespace().any(|item| item == *key)
                     && settings.values.contains_key(*key)
                 {
@@ -90,11 +90,6 @@ impl Settings {
                 .cloned()
                 .or_else(|| self.values.get(key).cloned())
         })?;
-        if let Some(value) = values.get("CONTEXT_RECENT_TURNS").filter(|v| !v.is_empty()) {
-            if !value.parse::<usize>().is_ok_and(|n| (1..=100).contains(&n)) {
-                return Err("CONTEXT_RECENT_TURNS must be 1..100".into());
-            }
-        }
         if let Some(raw) = values.get("AGENT_ENV_JSON") {
             let env = agent_runtime::environment::AgentEnvironment::merge(
                 self.get("AGENT_ENV_JSON"),
@@ -120,9 +115,9 @@ impl Settings {
         let environment =
             agent_runtime::environment::AgentEnvironment::from_json(self.get("AGENT_ENV_JSON"))?;
         match self.get("ADMIN_AGENT_PROVIDER") {
-            "" | "carbot" => Ok(RuntimeConfig::Carbot(HarnessConfig::from_lookup(|key| {
+            "" | "crabot" => Ok(RuntimeConfig::Crabot(HarnessConfig::from_lookup(|key| {
                 if key == "CONTEXT_STRATEGY" {
-                    return Some("extractive".into());
+                    return Some("intelligent".into());
                 }
                 environment.get(key).cloned().or_else(|| {
                     self.values
@@ -155,7 +150,7 @@ impl Settings {
                 Ok(RuntimeConfig::OpenCode(cfg))
             }
             "mock" => Ok(RuntimeConfig::Mock),
-            _ => Err("ADMIN_AGENT_PROVIDER must be carbot, codex, claude, opencode or mock".into()),
+            _ => Err("ADMIN_AGENT_PROVIDER must be crabot, codex, claude, opencode or mock".into()),
         }
     }
     /// Build the OpenCode runner independently of which runner is currently saved.

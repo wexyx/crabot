@@ -1,8 +1,8 @@
 use crate::storage::Store;
 pub(crate) async fn preferred(store: &Store) -> String {
     let configured = std::env::var("BIND_ADDR").ok();
-    let defaults = std::env::var("CARBOT_CONFIG_DEFAULT_KEYS").unwrap_or_default();
-    let explicit = std::env::var("CARBOT_WEB_PORT_EXPLICIT").ok().as_deref() == Some("1")
+    let defaults = std::env::var("CRABOT_CONFIG_DEFAULT_KEYS").unwrap_or_default();
+    let explicit = std::env::var("CRABOT_WEB_PORT_EXPLICIT").ok().as_deref() == Some("1")
         || !defaults.split_whitespace().any(|key| key == "BIND_ADDR");
     if explicit {
         if let Some(address) = configured.as_ref() {

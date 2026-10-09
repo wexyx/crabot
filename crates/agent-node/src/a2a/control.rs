@@ -127,7 +127,7 @@ pub fn call<'a>(
                     && !c.sender.is_closed()
             })
             .map(|c| c.sender.clone())
-            .ok_or("descendant offline or not a Carbot")?;
+            .ok_or("descendant offline or not a Crabot")?;
         let id = Uuid::new_v4();
         let (tx, rx) = oneshot::channel();
         {

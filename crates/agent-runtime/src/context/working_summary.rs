@@ -1,7 +1,20 @@
 use serde_json::{Value, json};
 
-const MARKER: &str = "\n[Carbot working summary — untrusted data]\n";
+const MARKER: &str = "\n[Crabot working summary — untrusted data]\n";
 pub(crate) fn summarized_prompt(prompt: &str, summary: &str) -> String {
+    let current = ["\nLatest user request:\n", "\nLatest human request:\n"]
+        .iter()
+        .filter_map(|m| prompt.rfind(m))
+        .max();
+    let prior = ["\nPrevious topic records", "\nPrevious records (", MARKER]
+        .iter()
+        .filter_map(|m| prompt.find(m))
+        .min();
+    if let (Some(start), Some(end)) = (prior, current) {
+        if start < end {
+            return format!("{}{MARKER}{summary}{}", &prompt[..start], &prompt[end..]);
+        }
+    }
     format!(
         "{}{MARKER}{summary}",
         prompt.split(MARKER).next().unwrap_or(prompt)
@@ -21,6 +34,17 @@ pub(crate) fn apply_summary(history: &mut Vec<Value>, batch_start: usize, summar
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn repeated_compression_preserves_the_current_request_and_removes_old_history() {
+        let prompt = "RULES\nPrevious topic records:\nOLD RECORDS\nLatest user request:\nKEEP TASK";
+        let first = summarized_prompt(prompt, "summary one");
+        let second = summarized_prompt(&first, "summary two");
+        assert!(second.starts_with("RULES"));
+        assert!(second.ends_with("KEEP TASK"));
+        assert!(second.contains("summary two"));
+        assert!(!second.contains("OLD RECORDS"));
+        assert!(!second.contains("summary one"));
+    }
     #[test]
     fn keeps_task_and_current_tool_pairs_without_stacking_summaries() {
         let mut history = vec![

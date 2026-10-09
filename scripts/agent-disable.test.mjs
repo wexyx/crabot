@@ -7,14 +7,14 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,history,policy} from './admin-fixture.mjs'
 test('disabling an Agent rejects new work without interrupting its running task',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-disable-'));let node,response,entered
+ const dir=await mkdtemp(join(tmpdir(),'crabot-disable-'));let node,response,entered
  const started=new Promise(r=>entered=r)
  const model=createServer(async(req,res)=>{for await(const chunk of req){}response=res;entered()})
  model.listen(0,'127.0.0.1');await once(model,'listening')
  try{
   node=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
   const p=(await request(node,'/v1/repl')).projects[0].id,base=`/v1/repl/${p}`
-  const saved=await fetch(node.url+base+'/agents',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({client_id:'worker',provider:'carbot',role:'fixture',expected_version:0,configuration:{MODEL_PROVIDER:'compatible',MODEL_NAME:'fixture',MODEL_API:'chat',MODEL_BASE_URL:`http://127.0.0.1:${model.address().port}/v1`,MODEL_API_KEY:'fixture'}})})
+  const saved=await fetch(node.url+base+'/agents',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({client_id:'worker',provider:'crabot',role:'fixture',expected_version:0,configuration:{MODEL_PROVIDER:'compatible',MODEL_NAME:'fixture',MODEL_API:'chat',MODEL_BASE_URL:`http://127.0.0.1:${model.address().port}/v1`,MODEL_API_KEY:'fixture'}})})
   assert.equal(saved.status,200)
   await request(node,base+'/agents/worker/start',{})
   const group=await request(node,base+'/groups',{policy:{...policy('worker'),mode:'chat'}})

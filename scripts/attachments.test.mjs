@@ -4,8 +4,8 @@ import {mkdtemp,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,pause} from './admin-fixture.mjs'
-test('uploads use local guarded URLs, accept messages, and preserve JSONL references',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-attachment-test-'));let server
+test('uploads use local guarded URLs, accept messages, and preserve indexed references',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'crabot-attachment-test-'));let server
  try{
   server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
   const upload=await fetch(server.url+'/v1/attachments?name=hello.txt',{method:'POST',headers:{'content-type':'application/octet-stream'},body:'ATTACHMENT_CONTENT'})
@@ -28,8 +28,7 @@ test('uploads use local guarded URLs, accept messages, and preserve JSONL refere
   assert.equal(row.status,'completed',JSON.stringify(row))
   assert.equal(row.events.find(e=>e.type==='user').content,content)
   assert.ok(row.events.some(e=>e.type==='completed'&&e.text.includes('Mock Agent')))
-  const logs=await request(server,`/v1/repl/${p}/chats/admin/logs`)
-  const page=await request(server,`/v1/repl/${p}/chats/admin/logs/files/${logs.files[0].name}?from_line=1&to_line=1`)
-  assert.equal(page.lines.length,1);assert.equal(page.lines[0].line,1)
+  const logs=await request(server,`/v1/repl/${p}/chats/admin/history`)
+  assert.ok(logs.events.some(e=>e.type==="user"&&e.content===content))
  }finally{await stop(server);await rm(dir,{recursive:true,force:true})}
 })

@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process'
 import {start,stop,request} from './admin-fixture.mjs'
 
 test('human configuration requires authentication, masks secrets and survives restart',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-admin-config-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-admin-config-'))
   let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
@@ -15,11 +15,11 @@ test('human configuration requires authentication, masks secrets and survives re
     assert.equal((await fetch(server.url+path,{headers:{origin:'https://evil.example'}})).status,403)
     const put=body=>fetch(server.url+path,{method:'PUT',headers:{'x-admin-token':server.token,'content-type':'application/json'},body:JSON.stringify(body)})
     assert.equal((await put({UNKNOWN:'value'})).status,400)
-    let response=await put({ADMIN_AGENT_PROVIDER:'carbot',MODEL_PROVIDER:'ollama',MODEL_NAME:'fixture',MODEL_API_KEY:'secret-fixture',MODEL_API:'chat',MODEL_BASE_URL:'http://localhost:11434/v1'})
+    let response=await put({ADMIN_AGENT_PROVIDER:'crabot',MODEL_PROVIDER:'ollama',MODEL_NAME:'fixture',MODEL_API_KEY:'secret-fixture',MODEL_API:'chat',MODEL_BASE_URL:'http://localhost:11434/v1'})
     assert.ok(response.ok,await response.text())
     const project=(await request(server,"/v1/repl")).projects[0].id
     const defaultAgent=(await request(server,"/v1/repl/"+project+"/agents")).agents.find(a=>a.is_default)
-    assert.equal(defaultAgent.provider,"carbot")
+    assert.equal(defaultAgent.provider,"crabot")
     assert.equal(defaultAgent.online,true)
     const view=await request(server,path)
     assert.equal(view.configuration.has_api_key,true)
@@ -28,7 +28,7 @@ test('human configuration requires authentication, masks secrets and survives re
     const saved=JSON.parse(await readFile(file,'utf8'))
     assert.equal(saved.MODEL_API_KEY,'secret-fixture')
     assert.equal((await stat(file)).mode&0o777,0o600)
-    response=await put({ADMIN_AGENT_PROVIDER:'carbot',MODEL_PROVIDER:'invalid'})
+    response=await put({ADMIN_AGENT_PROVIDER:'crabot',MODEL_PROVIDER:'invalid'})
     assert.equal(response.status,409)
     assert.deepEqual(JSON.parse(await readFile(file,'utf8')),saved)
     await stop(server)
@@ -37,7 +37,7 @@ test('human configuration requires authentication, masks secrets and survives re
     assert.equal(loaded.configuration.values.MODEL_PROVIDER,'ollama')
     assert.equal(loaded.configuration.has_api_key,true)
     await stop(server)
-    server=await start(dir,{ADMIN_AGENT_PROVIDER:undefined,MODEL_PROVIDER:'invalid-template',MODEL_NAME:'',MODEL_API_KEY:'',MODEL_API:'',MODEL_BASE_URL:'',CARBOT_CONFIG_DEFAULT_KEYS:' MODEL_PROVIDER MODEL_NAME MODEL_API_KEY MODEL_API MODEL_BASE_URL '})
+    server=await start(dir,{ADMIN_AGENT_PROVIDER:undefined,MODEL_PROVIDER:'invalid-template',MODEL_NAME:'',MODEL_API_KEY:'',MODEL_API:'',MODEL_BASE_URL:'',CRABOT_CONFIG_DEFAULT_KEYS:' MODEL_PROVIDER MODEL_NAME MODEL_API_KEY MODEL_API MODEL_BASE_URL '})
     const retained=await request(server,path)
     assert.equal(retained.configuration.values.MODEL_PROVIDER,'ollama')
     assert.equal(retained.configuration.has_api_key,true)
@@ -45,20 +45,20 @@ test('human configuration requires authentication, masks secrets and survives re
 })
 
 test('noninteractive invalid startup fails clearly without waiting for stdin',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-admin-missing-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-admin-missing-'))
   try{
-    const result=spawnSync(resolve('target/debug/agent-node'),['--cli'],{cwd:dir,env:{PATH:process.env.PATH,CARBOT_DATA_DIR:dir,MODEL_PROVIDER:'invalid'},encoding:'utf8',timeout:5000})
+    const result=spawnSync(resolve('target/debug/agent-node'),['--cli'],{cwd:dir,env:{PATH:process.env.PATH,CRABOT_DATA_DIR:dir,MODEL_PROVIDER:'invalid'},encoding:'utf8',timeout:5000})
     assert.equal(result.status,2)
-    assert.match(result.stderr,/请在终端运行 carbot 完成配置/)
+    assert.match(result.stderr,/请在终端运行 crabot 完成配置/)
     assert.doesNotMatch(result.stderr,/AdminAgent/)
     assert.ok(!result.stdout.includes('Local data:'))
   }finally{await rm(dir,{recursive:true,force:true})}
 })
 
 test('CLI can reconfigure after startup without sending settings to the model',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-admin-repl-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-admin-repl-'))
   try{
-    const result=spawnSync(resolve('target/debug/agent-node'),['--cli'],{cwd:dir,env:{PATH:process.env.PATH,CARBOT_DATA_DIR:dir,ADMIN_AGENT_PROVIDER:'mock'},input:'/admin-config\ncodex\n/usr/bin/false\n/exit\n',encoding:'utf8',timeout:10000})
+    const result=spawnSync(resolve('target/debug/agent-node'),['--cli','--web-port','0'],{cwd:dir,env:{PATH:process.env.PATH,CRABOT_DATA_DIR:dir,ADMIN_AGENT_PROVIDER:'mock'},input:'/admin-config\ncodex\n/usr/bin/false\n{}\n/exit\n',encoding:'utf8',timeout:10000})
     assert.equal(result.status,0,result.stderr)
     assert.match(result.stdout,/配置已保存并生效/)
     const saved=JSON.parse(await readFile(join(dir,'default-agent.json'),'utf8'))

@@ -9,7 +9,7 @@ const props=defineProps({agent:Object,project:String,request:Function,stream:Fun
 defineEmits(['close'])
 const attachments=ref([]),attachmentPicker=ref(null),uploading=ref(false)
 const hasMore=ref(false)
-async function older(){const result=await props.request(base()+'/chats/'+group.value+'/logs?before='+(rows.value[0]?.seq||0));if(!alive)return;const ids=new Set(rows.value.map(r=>r.seq));rows.value=[...result.events.filter(r=>!ids.has(r.seq)),...rows.value];hasMore.value=result.has_more}
+async function older(){const result=await props.request(base()+'/chats/'+group.value+'/history?before='+(rows.value[0]?.seq||0));if(!alive)return;const ids=new Set(rows.value.map(r=>r.seq));rows.value=[...result.events.filter(r=>!ids.has(r.seq)),...rows.value];hasMore.value=result.has_more}
 const rows=ref([]),text=ref(''),error=ref(''),busy=ref(false),running=ref(false),group=ref(''),run=ref(''),permissions=ref([]),optimistic=ref(null)
 const messages=computed(()=>{const result=conversationView(rows.value);if(optimistic.value)result.push(optimistic.value);return result})
 let live,alive=true,timer
@@ -29,7 +29,7 @@ async function stop(){try{await props.request('/v1/sessions/'+run.value+'/interr
 onMounted(async()=>{
  try{
   const value=await props.request(base()+'/agent-tests',post({path:props.agent.path||[props.agent.id]}));if(!alive)return;group.value=value.key
-  const history=await props.request(base()+'/chats/'+group.value+'/logs');if(!alive)return;rows.value=history.events;hasMore.value=history.has_more;run.value=history.active_run||'';running.value=!!run.value
+  const history=await props.request(base()+'/chats/'+group.value+'/history');if(!alive)return;rows.value=history.events;hasMore.value=history.has_more;run.value=history.active_run||'';running.value=!!run.value
   const opened=await props.stream(base()+'/chats/'+group.value+'/events?after='+(rows.value.at(-1)?.seq||0),add,e=>{if(alive)error.value=e.message})
   if(!alive){opened.close();return}live=opened
   timer=setInterval(async()=>{try{const result=await props.request('/v1/workspace/approvals');if(alive)permissions.value=result.requests.filter(p=>p.conversation_id===props.project+':'+group.value)}catch(e){if(alive)error.value=e.message}},1500)

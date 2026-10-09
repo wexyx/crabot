@@ -37,6 +37,36 @@ impl ToolRegistry {
     pub fn definitions(&self) -> Vec<ToolDefinition> {
         self.tools.values().map(|(d, _)| d.clone()).collect()
     }
+    /// The definitions a model may see: the discovery entry points plus whatever it
+    /// has revealed through `find_tools` during this run.
+    pub fn advertised(&self, session: &ToolSession) -> Vec<ToolDefinition> {
+        self.tools
+            .values()
+            .filter(|(d, _)| {
+                super::exposure::is_discovery(d.name()) || session.is_unlocked(d.name())
+            })
+            .map(|(d, _)| d.clone())
+            .collect()
+    }
+    /// A registry restricted to what the model may see.
+    ///
+    /// A provider protocol takes a `&ToolRegistry` and reads `definitions()`, so
+    /// handing it a projection keeps every protocol unchanged while hiding the rest
+    /// of the toolset. Execution still runs against the full registry: discovery
+    /// decides what is *shown*, and the policy layer already removed what is not
+    /// allowed.
+    pub fn exposed(&self, session: &ToolSession) -> Self {
+        Self {
+            tools: self
+                .tools
+                .iter()
+                .filter(|(name, _)| {
+                    super::exposure::is_discovery(name) || session.is_unlocked(name)
+                })
+                .map(|(name, entry)| (name.clone(), entry.clone()))
+                .collect(),
+        }
+    }
     pub async fn execute(
         &self,
         name: &str,

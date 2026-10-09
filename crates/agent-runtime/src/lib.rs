@@ -1,6 +1,5 @@
 pub mod agent;
 pub mod attachments;
-mod browser;
 pub mod config;
 pub mod context;
 pub mod environment;
@@ -11,6 +10,7 @@ mod factory;
 pub mod json;
 mod managed_runtime;
 pub mod paths;
+pub mod prompts;
 mod providers;
 mod runtime;
 mod runtime_kind;

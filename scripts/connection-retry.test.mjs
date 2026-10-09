@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,pause} from './admin-fixture.mjs'
 test('failed connections attempt once, deduplicate and allow manual retry/delete',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-retry-'));let node,calls=0
+ const dir=await mkdtemp(join(tmpdir(),'crabot-retry-'));let node,calls=0
  const peer=createServer((req,res)=>{calls++;res.writeHead(503);res.end('unavailable')})
  peer.listen(0,'127.0.0.1');await once(peer,'listening')
  try{

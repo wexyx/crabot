@@ -39,7 +39,7 @@ async fn browse(path: Option<PathBuf>) -> std::io::Result<Value> {
 mod tests {
     #[tokio::test]
     async fn only_lists_directories() {
-        let root = std::env::temp_dir().join(format!("carbot-picker-{}", uuid::Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("crabot-picker-{}", uuid::Uuid::new_v4()));
         tokio::fs::create_dir_all(root.join("child")).await.unwrap();
         tokio::fs::write(root.join("secret.txt"), "not exposed")
             .await

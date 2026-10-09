@@ -8,7 +8,7 @@ import {join,resolve} from 'node:path'
 import {pause,request} from './admin-fixture.mjs'
 
 test('CLI opens one persistent simple chat and enters management only by command',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-default-chat-'));let child,output=''
+ const dir=await mkdtemp(join(tmpdir(),'crabot-default-chat-'));let child,output=''
  const wait=async text=>{for(let i=0;i<250;i++){if(output.includes(text))return;await pause(20)}throw Error(output)}
  const close=async()=>{const ended=once(child,'exit');child.stdin.end('/exit\n');await ended;assert.equal(child.exitCode,0)}
  const launch=async()=>{
@@ -33,7 +33,7 @@ test('CLI opens one persistent simple chat and enters management only by command
   assert.ok(!output.includes('persistent-simple-chat-marker'))
   child.stdin.write('/history\n');await wait('persistent-simple-chat-marker')
   output='';child.stdin.write('/new\n');await wait('已开启新上下文');await wait('group>')
-  const logs=await request(server,`/v1/repl/${next[0].namespace_id}/chats/${next[0].key}/logs?limit=100`)
+  const logs=await request(server,`/v1/repl/${next[0].namespace_id}/chats/${next[0].key}/history?limit=100`)
   assert.match(JSON.stringify(logs),/context.reset/)
   assert.match(JSON.stringify(logs),/persistent-simple-chat-marker/)
   await close()

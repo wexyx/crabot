@@ -1,12 +1,6 @@
-use super::{
-    executor::{ExecutionFuture, ProcessExecutor},
-    profile::Profile,
-    service::ExecutionService,
-};
-use crate::skills::{ExecutionRequest, SkillDefinition};
+use super::{profile::Profile, service::ExecutionService};
 use serde_json::json;
 use std::{
-    collections::BTreeMap,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -24,23 +18,26 @@ impl Drop for Guard {
         self.0.fetch_add(1, Ordering::SeqCst);
     }
 }
-impl ProcessExecutor for Fixture {
-    fn execute<'a>(
-        &'a self,
-        _request: &'a ExecutionRequest,
-        _profile: &'a Profile,
-    ) -> ExecutionFuture<'a> {
-        Box::pin(async move {
-            let _guard = Guard(self.dropped.clone());
-            self.entered.notify_one();
-            if self.hang {
-                std::future::pending::<()>().await;
-            }
-            Ok(json!({"stdout":"ok"}))
-        })
+impl Fixture {
+    async fn execute(self: Arc<Self>, _profile: Profile) -> Result<serde_json::Value, String> {
+        let _guard = Guard(self.dropped.clone());
+        self.entered.notify_one();
+        if self.hang {
+            std::future::pending::<()>().await;
+        }
+        Ok(json!({"stdout":"ok"}))
     }
 }
-fn setup(hang: bool) -> (Arc<ExecutionService>, Arc<Fixture>, ExecutionRequest) {
+async fn run(
+    execution: &Arc<ExecutionService>,
+    fixture: Arc<Fixture>,
+    profile: String,
+) -> Result<serde_json::Value, String> {
+    execution
+        .supervise(profile, move |profile| fixture.execute(profile))
+        .await
+}
+fn setup(hang: bool) -> (Arc<ExecutionService>, Arc<Fixture>, String) {
     let fixture = Arc::new(Fixture {
         entered: tokio::sync::Notify::new(),
         dropped: Arc::new(AtomicUsize::new(0)),
@@ -49,34 +46,16 @@ fn setup(hang: bool) -> (Arc<ExecutionService>, Arc<Fixture>, ExecutionRequest) 
     let profile =
         serde_json::from_value(json!({"id":"default","network":"host","timeout_seconds":1}))
             .unwrap();
-    let execution = Arc::new(ExecutionService::new(fixture.clone(), vec![profile]).unwrap());
-    let skill = SkillDefinition::new(
-        "test".into(),
-        "test".into(),
-        BTreeMap::from([
-            ("SKILL.md".into(), "test".into()),
-            ("scripts/run.py".into(), "print('ok')".into()),
-        ]),
-        true,
-        true,
-    )
-    .unwrap();
-    let request = ExecutionRequest {
-        access: vec![],
-        workdir: ".".into(),
-        skill,
-        path: "scripts/run.py".into(),
-        args: vec![],
-        profile: "default".into(),
-    };
-    (execution, fixture, request)
+    let execution = Arc::new(ExecutionService::new(vec![profile]).unwrap());
+    (execution, fixture, "default".into())
 }
 #[tokio::test]
 async fn native_supervisor_cancellation_releases_execution_before_shutdown() {
     let (execution, fixture, request) = setup(true);
     let task = {
         let s = execution.clone();
-        tokio::spawn(async move { s.execute(request).await })
+        let fixture = fixture.clone();
+        tokio::spawn(async move { run(&s, fixture, request).await })
     };
     tokio::time::timeout(Duration::from_secs(2), fixture.entered.notified())
         .await
@@ -89,27 +68,27 @@ async fn native_supervisor_cancellation_releases_execution_before_shutdown() {
 async fn native_supervisor_timeout_and_shutdown_fail_closed() {
     let (execution, fixture, request) = setup(true);
     assert!(
-        execution
-            .execute(request.clone())
+        run(&execution, fixture.clone(), request.clone())
             .await
             .unwrap_err()
             .contains("timed out")
     );
     assert_eq!(fixture.dropped.load(Ordering::SeqCst), 1);
     execution.shutdown().await;
-    assert!(execution.execute(request).await.is_err());
+    assert!(run(&execution, fixture.clone(), request).await.is_err());
 }
 #[tokio::test]
 async fn native_supervisor_success_and_unknown_profile() {
     let (execution, fixture, request) = setup(false);
     assert_eq!(
-        execution.execute(request.clone()).await.unwrap()["stdout"],
+        run(&execution, fixture.clone(), request.clone())
+            .await
+            .unwrap()["stdout"],
         "ok"
     );
     assert_eq!(fixture.dropped.load(Ordering::SeqCst), 1);
-    let mut invalid = request;
-    invalid.profile = "unknown".into();
-    assert!(execution.execute(invalid).await.is_err());
+    let invalid = "unknown".into();
+    assert!(run(&execution, fixture.clone(), invalid).await.is_err());
 }
 #[test]
 fn native_profile_rejects_retired_fields_and_unsafe_environment() {
@@ -167,6 +146,7 @@ async fn cancellation_kills_spawned_children() {
             root,
             "(sleep 1; printf leaked > leaked) & printf ready > ready; wait".into(),
             profile,
+            Default::default(),
         )
         .await
     });

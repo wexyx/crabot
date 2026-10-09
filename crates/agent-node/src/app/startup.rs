@@ -11,7 +11,7 @@ pub(crate) fn configure() -> Result<Option<bool>, String> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--version" | "-V" => {
-                println!("Carbot {}", super::version::DISPLAY);
+                println!("Crabot {}", super::version::DISPLAY);
                 return Ok(None);
             }
             "--cli" => interactive = true,
@@ -60,7 +60,7 @@ pub(crate) fn configure() -> Result<Option<bool>, String> {
         if data_dir.is_some() {
             return Err("choose --name or --data-dir, not both".into());
         }
-        data_dir = Some(agent_runtime::paths::user_home().join(format!(".carbot_{name}")));
+        data_dir = Some(agent_runtime::paths::user_home().join(format!(".crabot_{name}")));
     }
     super::startup_environment::StartupEnvironment::load(data_dir)?;
     let outside = outside
@@ -80,11 +80,11 @@ pub(crate) fn configure() -> Result<Option<bool>, String> {
     // No application threads exist at this startup-only call site.
     unsafe {
         if let Some(name) = name {
-            std::env::set_var("CARBOT_INSTANCE", name);
+            std::env::set_var("CRABOT_INSTANCE", name);
         }
         if let Some(port) = web_port {
             std::env::set_var("BIND_ADDR", format!("127.0.0.1:{port}"));
-            std::env::set_var("CARBOT_WEB_PORT_EXPLICIT", "1");
+            std::env::set_var("CRABOT_WEB_PORT_EXPLICIT", "1");
         }
         std::env::set_var("AGENT_WORKDIR", root);
         std::env::set_var("AGENT_OUTSIDE_ACCESS", outside);

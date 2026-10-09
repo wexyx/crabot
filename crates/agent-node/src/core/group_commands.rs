@@ -5,7 +5,7 @@ use super::{
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-pub(crate) const HELP: &str = "@名字 内容（只与该 Agent 对话；未 @ 时按群模式协作）\n/new（新上下文，保留历史）\n/members（或 /agents）\n/add-agent PATH [群内角色]\n/remove-agent PATH\n/agent PATH\n/agent PATH role 群内角色\n/agent PATH leader\n/agent PATH provider mock|carbot|codex|claude|opencode（先停止）\n/agent PATH start\n/group mode chat|relay|a2a|pmo\n/group instructions 群协作要求";
+pub(crate) const HELP: &str = "@名字 内容（只与该 Agent 对话；未 @ 时按群模式协作）\n/new（新上下文，保留历史）\n/members（或 /agents）\n/add-agent PATH [群内角色]\n/remove-agent PATH\n/agent PATH\n/agent PATH role 群内角色\n/agent PATH leader\n/agent PATH provider mock|crabot|codex|claude|opencode（先停止）\n/agent PATH start\n/group mode chat|relay|discussion|leader\n/group instructions 群协作要求";
 impl Core {
     pub(crate) async fn group_command(
         &self,
@@ -123,9 +123,9 @@ impl Core {
                     policy.mode = match rest.trim() {
                         "chat" => Mode::Chat,
                         "relay" => Mode::Relay,
-                        "a2a" => Mode::A2a,
-                        "pmo" => Mode::Pmo,
-                        _ => return Err("mode must be relay, a2a or pmo".into()),
+                        "discussion" | "a2a" | "讨论" => Mode::A2a,
+                        "leader" | "pmo" => Mode::Pmo,
+                        _ => return Err("mode must be chat, relay, discussion or leader".into()),
                     }
                 }
                 "instructions" => policy.instructions = rest.trim().into(),
@@ -145,15 +145,11 @@ impl Core {
             "群配置已更新（版本 {}）。当前执行仍使用原策略，新一轮使用新配置。",
             updated["version"]
         );
-        self.state()
-            .store
-            .logs()
-            .append(
-                project,
-                format!("group:{key}"),
-                vec![json!({"type":"command.result","content":message,"command":line})],
-            )
-            .await?;
+        crate::storage::knowledge::persist(
+            project,
+            &format!("group:{key}"),
+            &[json!({"type":"command.result","content":message,"command":line})],
+        )?;
         Ok(json!({"message":message,"group":updated}))
     }
 }

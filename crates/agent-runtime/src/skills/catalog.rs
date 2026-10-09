@@ -1,5 +1,4 @@
 use super::SkillDefinition;
-use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Default)]
@@ -36,9 +35,6 @@ impl SkillCatalog {
             .get(id)
             .ok_or_else(|| "unknown or disabled skill".into())
     }
-    pub(crate) fn manifest(&self) -> Value {
-        json!(self.skills.values().map(|s|json!({"id":s.id(),"description":s.description(),"python_approved":s.allow_python(),"files":s.files().keys().collect::<Vec<_>>()})).collect::<Vec<_>>())
-    }
 }
 
 #[cfg(test)]
@@ -57,6 +53,6 @@ mod tests {
         let catalog = SkillCatalog::new(vec![skill]).unwrap();
         assert!(catalog.is_empty());
         assert!(catalog.get("disabled").is_err());
-        assert!(!catalog.manifest().to_string().contains("private"));
+        assert!(!catalog.definitions().iter().any(|s| s.id() == "disabled"));
     }
 }

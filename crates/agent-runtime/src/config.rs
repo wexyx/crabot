@@ -1,15 +1,20 @@
 //! Public configuration facade. Each provider owns its concrete configuration.
 use crate::RuntimeKind;
+pub use crate::providers::executable::LauncherAvailability;
 pub use crate::providers::opencode::models::{
     Catalog as OpenCodeCatalog, Model as OpenCodeModel, Source as OpenCodeCatalogSource,
     discover as opencode_models,
 };
 pub use crate::providers::{
-    carbot::config::{HarnessConfig, ModelApi},
     claude::config::ClaudeConfig,
     codex::config::CodexConfig,
+    crabot::config::{HarnessConfig, ModelApi},
     opencode::config::OpenCodeConfig,
 };
+
+pub fn default_crabot_system_prompt() -> &'static str {
+    crate::providers::crabot::prompt::default_system_prompt()
+}
 use std::path::PathBuf;
 
 pub(crate) fn workdir() -> PathBuf {
@@ -19,7 +24,7 @@ pub(crate) fn workdir() -> PathBuf {
 #[derive(Clone)]
 pub enum RuntimeConfig {
     Mock,
-    Carbot(HarnessConfig),
+    Crabot(HarnessConfig),
     Claude(ClaudeConfig),
     Codex(CodexConfig),
     OpenCode(OpenCodeConfig),
@@ -28,7 +33,7 @@ impl RuntimeConfig {
     pub(crate) fn environment(&self) -> crate::environment::AgentEnvironment {
         match self {
             Self::Mock => Default::default(),
-            Self::Carbot(cfg) => cfg.environment.clone(),
+            Self::Crabot(cfg) => cfg.environment.clone(),
             Self::Codex(cfg) => cfg.environment.clone(),
             Self::Claude(cfg) => cfg.environment.clone(),
             Self::OpenCode(cfg) => cfg.environment.clone(),
@@ -39,7 +44,7 @@ impl RuntimeConfig {
         if let Some(root) = crate::workspace::WorkspaceSettings::root() {
             match &mut self {
                 Self::Mock => (),
-                Self::Carbot(config) => config.root = root,
+                Self::Crabot(config) => config.root = root,
                 Self::Codex(config) => config.workdir = root,
                 Self::Claude(config) => config.workdir = root,
                 Self::OpenCode(config) => config.workdir = root,
@@ -50,7 +55,7 @@ impl RuntimeConfig {
     pub fn kind(&self) -> RuntimeKind {
         match self {
             Self::Mock => RuntimeKind::Mock,
-            Self::Carbot(_) => RuntimeKind::Carbot,
+            Self::Crabot(_) => RuntimeKind::Crabot,
             Self::Codex(_) => RuntimeKind::Codex,
             Self::Claude(_) => RuntimeKind::Claude,
             Self::OpenCode(_) => RuntimeKind::OpenCode,
@@ -62,7 +67,7 @@ impl RuntimeConfig {
         )?;
         Ok(match kind {
             RuntimeKind::Mock => Self::Mock,
-            RuntimeKind::Carbot => Self::Carbot(HarnessConfig::from_env()?),
+            RuntimeKind::Crabot => Self::Crabot(HarnessConfig::from_env()?),
             RuntimeKind::Claude => {
                 let mut cfg = ClaudeConfig::from_env();
                 cfg.environment = environment;

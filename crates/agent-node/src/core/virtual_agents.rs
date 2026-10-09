@@ -112,20 +112,28 @@ pub(super) async fn execute(
         return Err("virtual Agent recursion blocked".into());
     }
     stack.push(id.into());
-    // Internal tool/progress messages stay inside the virtual Agent; its caller sees one answer.
-    let (tx, mut rx) = tokio::sync::mpsc::channel(128);
     let config = state.policy_store.get(p, "virtual_agent", id).await?;
     let prompt = format!(
         "Response requirements: {}\n{prompt}",
-        config.body["response_instructions"]
-            .as_str()
-            .unwrap_or(super::response_instructions::DEFAULT)
+        super::response_instructions::current(config.body["response_instructions"].as_str())?
     );
+    STACK
+        .scope(stack, invoke(state, p, policy, &prompt, visited))
+        .await
+}
+
+/// Invoke an ephemeral composition without looking up a persisted virtual Agent.
+pub(super) async fn invoke(
+    state: &AppState,
+    p: Uuid,
+    policy: Policy,
+    prompt: &str,
+    visited: &[String],
+) -> Result<String, String> {
+    // Internal tool/progress messages stay inside; the caller sees one answer.
+    let (tx, mut rx) = tokio::sync::mpsc::channel(128);
     let dispatch = super::policies::Dispatch::new(&tx, visited);
-    let work = STACK.scope(
-        stack,
-        Box::pin(engine(state, p, &policy, &prompt, &dispatch)),
-    );
+    let work = Box::pin(engine(state, p, &policy, prompt, &dispatch));
     tokio::pin!(work);
     loop {
         tokio::select! {

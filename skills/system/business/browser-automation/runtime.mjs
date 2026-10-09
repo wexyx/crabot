@@ -6,9 +6,9 @@ import {join,resolve} from 'node:path'
 
 export const puppeteerVersion='25.12.0'
 export function runtimeDirectory(env=process.env){
- const alias=env.CARBOT_INSTANCE||''
- if(alias&&!/^[a-zA-Z0-9_-]{1,64}$/.test(alias))throw Error('Invalid Carbot instance name')
- const data=env.CARBOT_DATA_DIR||join(homedir(),alias?`.carbot_${alias}`:'.carbot')
+ const alias=env.CRABOT_INSTANCE||''
+ if(alias&&!/^[a-zA-Z0-9_-]{1,64}$/.test(alias))throw Error('Invalid Crabot instance name')
+ const data=env.CRABOT_DATA_DIR||join(homedir(),alias?`.crabot_${alias}`:'.crabot')
  return join(resolve(data),'runtime','browser-automation','.runtime')
 }
 export async function runtimeReady(runtime=runtimeDirectory()){

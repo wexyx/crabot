@@ -1,7 +1,7 @@
 // A neutral operation category, not the model's claim that an operation is safe.
 export function approvalSummary(item, workspace){
  if(!workspace)return {title:'批准管理操作',description:item.warning||'确认后执行所选管理操作。'}
- if(item.operation?.startsWith('浏览器独立执行：'))return {title:'启动独立浏览器',description:'不受 Carbot 目录隔离限制；保留 Chromium 沙箱，使用临时配置，不复用个人 Cookie。'}
+ if(item.operation?.startsWith('浏览器独立执行：'))return {title:'启动独立浏览器',description:'不受 Crabot 目录隔离限制；保留 Chromium 沙箱，使用临时配置，不复用个人 Cookie。'}
  if(!item.command)return {title:'访问工作目录外的文件',description:'请求读取或写入指定目录，请核对目标路径。'}
  const command=item.command.trim()
  let title='执行 Shell 命令'

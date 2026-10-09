@@ -1,6 +1,31 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {conversationView} from './conversation-view.js'
+test('discussion yielding is a compact notice, not an assistant bubble',()=>{
+ const events=[
+  {seq:1,type:'agent.progress',agent:'reviewer',invocation_id:'r1'},
+  {seq:2,type:'agent.yield',agent:'reviewer',invocation_id:'r1',content:'已让出本轮'},
+  {seq:3,type:'agent.message',agent:'writer',invocation_id:'w1',content:'处理结果'},
+  {seq:4,type:'agent.message',aggregate:true,content:'reviewer: 本轮让出。'},
+ ]
+ assert.deepEqual(conversationView(events.slice(0,2)).map(r=>[r.type,r.text]),[['status','reviewer 已让出本轮']])
+ assert.deepEqual(conversationView(events).filter(r=>r.type==='assistant').map(r=>r.text),['处理结果'])
+ assert.equal(conversationView([{type:'agent.message',content:'本轮让出。'}])[0].type,'assistant')
+})
+test('accepted yields display the reason in the notice',()=>{
+ const rows=conversationView([{type:'agent.yield',agent:'reviewer',content:'已让出本轮 · 仅涉及翻译，没有待审核事项。'}])
+ assert.equal(rows[0].type,'status')
+ assert.equal(rows[0].text,'reviewer 已让出本轮 · 仅涉及翻译，没有待审核事项。')
+})
+test('discussion completion and unclaimed notices remain visible without aggregate duplicates',()=>{
+ const rows=conversationView([
+  {seq:1,type:'agent.activity',content:'本轮没有成员认领当前事项。'},
+  {seq:2,type:'agent.message',aggregate:true,content:'hidden aggregate'},
+ ])
+ assert.equal(rows.length,1)
+ assert.equal(rows[0].type,'status')
+ assert.equal(rows[0].text,'本轮没有成员认领当前事项。')
+})
 test('hundreds of stream fragments produce one answer, not hundreds of cards',()=>{
   const events=[{seq:1,type:'user',content:'在哪'}]
   for(let i=0;i<311;i++)events.push({seq:i+2,type:'text_delta',text:'字'})
@@ -40,7 +65,7 @@ test('members stream into separate bubbles and group aggregate never duplicates 
  assert.deepEqual(rows.filter(r=>r.type==='assistant').map(r=>[r.label,r.text]),[['alice','A!'],['bob','B!'],['alice','Next round']])
 })
 test('live tool JSON remains a tool event, not assistant text',()=>{
- const rows=conversationView([{seq:1,type:'agent.tool.started',agent:'a',invocation_id:'a1',content:'{"name":"command_run","input":{"command":"pwd"}}'},{seq:2,type:'agent.tool.finished',agent:'a',invocation_id:'a1',content:'{"output":"done"}'}])
+ const rows=conversationView([{seq:1,type:'agent.tool.started',agent:'a',invocation_id:'a1',content:'{"name":"shell","input":{"command":"pwd"}}'},{seq:2,type:'agent.tool.finished',agent:'a',invocation_id:'a1',content:'{"output":"done"}'}])
  assert.equal(rows.length,1);assert.equal(rows[0].type,'tool');assert.equal(rows[0].pending,false)
 })
 test('deliberation folds into progress and never becomes part of the answer',()=>{

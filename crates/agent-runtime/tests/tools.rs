@@ -20,7 +20,7 @@ fn context(catalog: SkillCatalog) -> ToolContext {
     ToolContext::new(
         None,
         catalog,
-        ExecutionPolicy::new("offline".into(), false).unwrap(),
+        ExecutionPolicy::new("offline".into()).unwrap(),
     )
     .unwrap()
 }
@@ -67,61 +67,89 @@ async fn macro_factory_and_dynamic_registration_use_same_contract() {
     assert_eq!(empty.definitions()[0].name(), "test_echo");
 }
 #[tokio::test]
-async fn skill_permissions_and_load_state_are_scoped_to_session() {
+async fn minimal_tools_load_skill_packages_and_execute_python_through_shell() {
+    let root = tempfile::tempdir().unwrap();
     let skill = SkillDefinition::new(
         "demo".into(),
         "demo".into(),
         BTreeMap::from([
-            ("SKILL.md".into(), "instructions".into()),
+            ("SKILL.md".into(), "Use shell after reading".into()),
             ("scripts/run.py".into(), "print('ok')".into()),
         ]),
         true,
-        true,
+        false,
     )
     .unwrap();
-    let registry = ToolFactory::create(context(SkillCatalog::new(vec![skill]).unwrap())).unwrap();
+    let registry = ToolFactory::create(
+        ToolContext::new(
+            Some(root.path().into()),
+            SkillCatalog::new(vec![skill]).unwrap(),
+            ExecutionPolicy::new("default".into()).unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let names = registry
+        .definitions()
+        .iter()
+        .map(|d| d.name().to_owned())
+        .collect::<Vec<_>>();
+    for removed in [
+        "read",
+        "read_file",
+        "list_files",
+        "command_run",
+        "context_compact",
+        "python_run",
+        "browser_run",
+        "skill_file",
+        "history_read",
+        "image_show",
+        "skill_read",
+    ] {
+        assert!(
+            !names.iter().any(|name| name == removed),
+            "{removed} must not be registered"
+        );
+    }
+    for required in ["shell", "find", "compact"] {
+        assert!(names.iter().any(|n| n == required));
+    }
     let mut session = ToolSession::default();
-    let args = json!({"skill_id":"demo","path":"scripts/run.py","args":[]});
-    assert!(
-        registry
-            .execute("python_run", &args, &mut session)
-            .await
-            .unwrap_err()
-            .contains("load skill_read")
-    );
+    let loaded = registry
+        .execute("find", &json!({"target":"skill","id":"demo"}), &mut session)
+        .await
+        .unwrap();
     assert_eq!(
-        registry
-            .execute("skill_read", &json!({"skill_id":"demo"}), &mut session)
-            .await
-            .unwrap()["instructions"],
-        "instructions"
+        loaded["skills"][0]["instructions"],
+        "Use shell after reading"
     );
+    let script = std::path::Path::new(loaded["skills"][0]["directory"].as_str().unwrap())
+        .join("scripts/run.py");
+    let command = format!(
+        "python3 {}",
+        shlex::try_quote(script.to_str().unwrap()).unwrap()
+    );
+    let output = agent_runtime::permissions::PermissionMode::Full
+        .scope(registry.execute("shell", &json!({"command":command}), &mut session))
+        .await
+        .unwrap();
+    assert_eq!(output["stdout"], "ok\n");
     assert!(
         registry
-            .execute("python_run", &args, &mut session)
-            .await
-            .unwrap_err()
-            .contains("Python denied")
-    );
-    let mut other = ToolSession::default();
-    assert!(
-        registry
-            .execute("python_run", &args, &mut other)
-            .await
-            .unwrap_err()
-            .contains("load skill_read")
-    );
-    assert!(
-        registry
-            .execute("skill_read", &json!({"skill_id":"outside"}), &mut session)
+            .execute(
+                "find",
+                &json!({"target":"skill","id":"outside"}),
+                &mut session
+            )
             .await
             .is_err()
     );
     assert!(
         registry
             .execute(
-                "skill_read",
-                &json!({"skill_id":"demo","command":"evil"}),
+                "find",
+                &json!({"target":"skill","id":"demo","command":"evil"}),
                 &mut session
             )
             .await

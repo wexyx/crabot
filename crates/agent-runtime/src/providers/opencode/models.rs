@@ -19,7 +19,7 @@ pub struct Model {
     pub input: Option<f64>,
     pub output: Option<f64>,
     pub context: Option<u64>,
-    /// The model advertises tool calling, which Carbot sessions require.
+    /// The model advertises tool calling, which Crabot sessions require.
     pub tools: bool,
     pub status: String,
     /// `false` means costs are unknown. Never infer "free" from a missing price.

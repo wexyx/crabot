@@ -19,8 +19,8 @@ pub(crate) struct Field {
 
 const RUNNER: Entry = Entry {
     key: "ADMIN_AGENT_PROVIDER",
-    label: "运行器 carbot / codex / claude / opencode",
-    default: "carbot",
+    label: "运行器 crabot / codex / claude / opencode",
+    default: "crabot",
     secret: false,
 };
 const MODEL_PROVIDER: Entry = Entry {
@@ -44,6 +44,12 @@ const MODEL_BASE_URL: Entry = Entry {
 const MODEL_API: Entry = Entry {
     key: "MODEL_API",
     label: "协议 chat / responses / anthropic（空值使用厂商默认）",
+    default: "",
+    secret: false,
+};
+const MODEL_SYSTEM_PROMPT: Entry = Entry {
+    key: "MODEL_SYSTEM_PROMPT",
+    label: "系统提示词（空值使用内置默认）",
     default: "",
     secret: false,
 };
@@ -86,12 +92,13 @@ const ENVIRONMENT: Entry = Entry {
 
 /// The runner decides the plan. OpenCode routes to models this node does not
 /// host, so it asks for a model while Codex and Claude only ask for a launcher.
-const CARBOT: &[Entry] = &[
+const CRABOT: &[Entry] = &[
     RUNNER,
     MODEL_PROVIDER,
     MODEL_NAME,
     MODEL_BASE_URL,
     MODEL_API,
+    MODEL_SYSTEM_PROMPT,
     MODEL_API_KEY,
     ENVIRONMENT,
 ];
@@ -106,19 +113,77 @@ pub(crate) struct Wizard {
     step: usize,
     /// Read once per wizard: the catalog only changes with the runner choice.
     catalog: Option<Result<Vec<OpenCodeModel>, String>>,
+    picker: super::choices::ChoicePicker,
+    manual: bool,
 }
 impl Wizard {
     pub(crate) fn new(settings: Settings) -> Self {
-        Self {
+        let mut wizard = Self {
             settings,
             step: 0,
             catalog: None,
+            picker: Default::default(),
+            manual: false,
+        };
+        wizard.reset_picker();
+        wizard
+    }
+    fn choices(&self) -> Vec<super::choices::Choice> {
+        use super::choices::{Choice, MANUAL};
+        if self.manual {
+            return vec![];
         }
+        let field = self.field();
+        if field.key != OPENCODE_MODEL.key {
+            return super::choices::fixed(field.key);
+        }
+        let mut choices: Vec<_> = self
+            .catalog
+            .as_ref()
+            .and_then(|v| v.as_ref().ok())
+            .into_iter()
+            .flatten()
+            .map(|m| Choice::new(&m.id, &describe(m)))
+            .collect();
+        if choices.is_empty() {
+            return choices;
+        }
+        if !choices.iter().any(|c| c.value == field.default) {
+            choices.push(Choice::new(
+                &field.default,
+                if field.default.is_empty() {
+                    "使用 OpenCode 默认模型"
+                } else {
+                    &field.default
+                },
+            ));
+        }
+        choices.push(Choice::new(MANUAL, "手动输入模型 ID"));
+        choices
+    }
+    fn reset_picker(&mut self) {
+        self.picker = super::choices::ChoicePicker::new(self.choices(), &self.field().default);
+    }
+    pub(crate) fn picker(&self) -> super::choices::ChoicePicker {
+        self.picker.clone()
+    }
+    pub(crate) fn move_choice(&mut self, forward: bool) -> bool {
+        self.picker.move_by(forward)
+    }
+    pub(crate) fn choice_menu(&self) -> String {
+        self.picker.menu()
+    }
+    pub(crate) fn choices_text(&self) -> String {
+        self.choices()
+            .iter()
+            .enumerate()
+            .map(|(i, c)| format!("  {}) {}\n", i + 1, c.label))
+            .collect()
     }
     fn plan(&self) -> &'static [Entry] {
         let runner = self.settings.get("ADMIN_AGENT_PROVIDER");
-        match if runner.is_empty() { "carbot" } else { runner } {
-            "carbot" => CARBOT,
+        match if runner.is_empty() { "crabot" } else { runner } {
+            "crabot" => CRABOT,
             "codex" => CODEX,
             "claude" => CLAUDE,
             "opencode" => OPENCODE,
@@ -140,7 +205,10 @@ impl Wizard {
     }
     /// Read the OpenCode catalog once, so every later step can reuse it.
     pub(crate) async fn refresh_catalog(&mut self) {
-        if self.settings.get("ADMIN_AGENT_PROVIDER") != "opencode" || self.catalog.is_some() {
+        if self.settings.get("ADMIN_AGENT_PROVIDER") != "opencode"
+            || self.catalog.is_some()
+            || self.step <= 1
+        {
             return;
         }
         // The launcher being typed may not be saved yet, so use the in-progress value.
@@ -169,6 +237,10 @@ impl Wizard {
     }
     /// The numbered model list for the current step, or why it cannot be shown.
     pub(crate) fn catalog_text(&self) -> String {
+        let field = self.field();
+        if let Err(error) = super::dependencies::check(field.key, &field.default) {
+            return format!("{error}\n");
+        }
         if self.field().key != OPENCODE_MODEL.key {
             return String::new();
         }
@@ -223,7 +295,10 @@ impl Wizard {
     }
     pub(crate) async fn submit(&mut self, raw: String) -> Result<Option<Settings>, String> {
         let value = if raw.trim().is_empty() {
-            self.field().default
+            self.picker
+                .value()
+                .map(str::to_owned)
+                .unwrap_or_else(|| self.field().default)
         } else if raw.trim() == "-" {
             String::new()
         } else {
@@ -233,9 +308,33 @@ impl Wizard {
     }
     pub(crate) async fn accept(&mut self, value: String) -> Result<Option<Settings>, String> {
         let field = self.field();
-        if self.step == 0 && !matches!(value.as_str(), "carbot" | "codex" | "claude" | "opencode") {
-            return Err("请选择 carbot、codex、claude 或 opencode。".into());
+        let choices = self.choices();
+        let value = if let Ok(number) = value.parse::<usize>() {
+            if !choices.is_empty() {
+                choices
+                    .get(number.wrapping_sub(1))
+                    .ok_or("选项序号无效")?
+                    .value
+                    .clone()
+            } else {
+                value
+            }
+        } else {
+            value
+        };
+        if value == super::choices::MANUAL {
+            self.manual = true;
+            self.reset_picker();
+            return Ok(None);
         }
+        let fixed = super::choices::fixed(field.key);
+        if !fixed.is_empty() && !fixed.iter().any(|c| c.value == value) {
+            return Err("请选择列表中的有效选项。".into());
+        }
+        if self.step == 0 && !matches!(value.as_str(), "crabot" | "codex" | "claude" | "opencode") {
+            return Err("请选择 crabot、codex、claude 或 opencode。".into());
+        }
+        super::dependencies::check(field.key, &value)?;
         let value = self.chosen_model(&field, &value).unwrap_or(value);
         if field.key == ENVIRONMENT.key {
             self.settings.update(std::collections::BTreeMap::from([(
@@ -246,10 +345,16 @@ impl Wizard {
             self.settings.set(field.key, value);
         }
         self.step += 1;
+        self.manual = false;
+        if field.key == OPENCODE_BIN.key {
+            self.catalog = None;
+        }
         // The runner may have just changed, so the plan and its catalog change with it.
         self.refresh_catalog().await;
+        self.reset_picker();
         if self.step >= self.plan().len() {
             self.step = 0;
+            self.reset_picker();
             self.settings.runtime()?;
             return Ok(Some(self.settings.clone()));
         }
@@ -284,6 +389,45 @@ fn describe(model: &OpenCodeModel) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn missing_cli_stays_on_launcher_step_and_explains_installation() {
+        for (runner, key) in [
+            ("codex", "CODEX_BIN"),
+            ("claude", "CLAUDE_BIN"),
+            ("opencode", "OPENCODE_BIN"),
+        ] {
+            let mut wizard = Wizard::new(Settings::default());
+            wizard.accept(runner.into()).await.unwrap();
+            let error = wizard
+                .accept("/does/not/exist/crabot-test-cli".into())
+                .await
+                .err()
+                .unwrap();
+            assert!(error.contains("请先安装"), "{error}");
+            assert!(error.contains("https://"));
+            assert_eq!(wizard.field().key, key);
+            assert_eq!(wizard.settings.get(key), "");
+        }
+    }
+    #[tokio::test]
+    async fn options_can_be_selected_by_keyboard_or_number_and_validate_immediately() {
+        let mut wizard = Wizard::new(Settings::default());
+        assert!(wizard.choice_menu().contains("› Crabot"));
+        wizard.move_choice(true);
+        assert!(wizard.choice_menu().contains("› Codex"));
+        wizard.submit(String::new()).await.unwrap();
+        assert_eq!(wizard.field().key, "CODEX_BIN");
+        assert!(wizard.choice_menu().is_empty());
+
+        let mut wizard = Wizard::new(Settings::default());
+        wizard.accept("1".into()).await.unwrap();
+        assert_eq!(wizard.field().key, "MODEL_PROVIDER");
+        assert!(wizard.accept("missing-provider".into()).await.is_err());
+        assert_eq!(wizard.field().key, "MODEL_PROVIDER");
+        wizard.accept("4".into()).await.unwrap();
+        assert_eq!(wizard.settings.get("MODEL_PROVIDER"), "deepseek");
+        assert_eq!(wizard.field().key, "MODEL_NAME");
+    }
     #[test]
     fn free_is_spelled_out_and_an_unknown_price_is_not_free() {
         let model = |free, priced, input| OpenCodeModel {
@@ -307,12 +451,24 @@ mod tests {
         let mut wizard = Wizard::new(Settings::default());
         assert!(wizard.accept("opencode".into()).await.unwrap().is_none());
         assert_eq!(wizard.field().key, "OPENCODE_BIN");
-        assert!(wizard.accept("opencode".into()).await.unwrap().is_none());
+        assert!(
+            wizard
+                .accept("/usr/bin/true".into())
+                .await
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(wizard.field().key, "OPENCODE_MODEL");
         let mut wizard = Wizard::new(Settings::default());
         assert!(wizard.accept("codex".into()).await.unwrap().is_none());
         assert_eq!(wizard.field().key, "CODEX_BIN");
-        assert!(wizard.accept("codex".into()).await.unwrap().is_none());
+        assert!(
+            wizard
+                .accept("/usr/bin/true".into())
+                .await
+                .unwrap()
+                .is_none()
+        );
         // Runner, launcher, environment: three prompts, then the wizard is done.
         assert!(wizard.accept(String::new()).await.unwrap().is_some());
         assert!(

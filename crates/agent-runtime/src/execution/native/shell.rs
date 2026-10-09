@@ -7,19 +7,20 @@ pub(crate) async fn execute(
     root: PathBuf,
     script: String,
     profile: Profile,
+    environment: std::collections::BTreeMap<String, String>,
 ) -> Result<Value, String> {
     let execution = NativeCommand::new(&root)?;
     let mut command = execution.command(Path::new("/bin/sh"), &root)?;
     command.arg("-c").arg(script);
+    command.envs(environment);
+    for (key, value) in profile.secrets()? {
+        command.env(key, value);
+    }
     #[cfg(unix)]
     unsafe {
         let seconds = profile.timeout_seconds;
         command.pre_exec(move || {
-            for (resource, limit) in [
-                (libc::RLIMIT_CPU, seconds),
-                (libc::RLIMIT_FSIZE, 16 * 1024 * 1024),
-                (libc::RLIMIT_NOFILE, 256),
-            ] {
+            for (resource, limit) in [(libc::RLIMIT_CPU, seconds), (libc::RLIMIT_NOFILE, 256)] {
                 let limit = libc::rlimit {
                     rlim_cur: limit as libc::rlim_t,
                     rlim_max: limit as libc::rlim_t,
@@ -46,15 +47,11 @@ pub(crate) async fn execute(
         json!({"success":status.success(),"exit_code":status.code(),"stdout":stdout,"stderr":stderr,"workdir":root,"execution":"host","network":"host"}),
     )
 }
-async fn read(reader: impl tokio::io::AsyncRead + Unpin) -> Result<String, String> {
+async fn read(mut reader: impl tokio::io::AsyncRead + Unpin) -> Result<String, String> {
     let mut bytes = vec![];
     reader
-        .take(65537)
         .read_to_end(&mut bytes)
         .await
         .map_err(|e| e.to_string())?;
-    if bytes.len() > 65536 {
-        return Err("command output exceeds 64 KiB".into());
-    }
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }

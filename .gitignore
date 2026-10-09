@@ -7,6 +7,10 @@ skills/**/.runtime/
 *.pid
 .env.*
 !.env.example
+.crabot_*/
+.crabot-*/
+# Legacy instance data stays local after the Crabot rename.
+.carbot/
 .carbot_*/
 .carbot-*/
 coverage/
@@ -17,9 +21,9 @@ coverage/
 *.pem
 *.key
 .env
-.carbot.env
-.carbot.env.*
-.carbot/
+.crabot.env
+.crabot.env.*
+.crabot/
 .client.env
 .node.env
 .gateway-client*.json

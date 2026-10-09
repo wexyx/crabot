@@ -41,7 +41,7 @@ impl Manager {
             .unwrap_or(json!({"version":0,"policy":ToolPolicy::default()}));
         let catalog = self.tool_catalog(p).await?;
         Ok(
-            json!({"version":row["version"],"policy":row["policy"],"builtins":catalog[scope],"note":"下一轮执行生效；内置工具不可删除。此策略只控制 Carbot 注册工具，不控制供应商 CLI 自带工具。外部命令固定内容、无参数插值，每次执行仍需人类确认。"}),
+            json!({"version":row["version"],"policy":row["policy"],"builtins":catalog[scope],"note":"下一轮执行生效；内置工具不可删除。此策略只控制 Crabot 注册工具，不控制供应商 CLI 自带工具。外部命令固定内容、无参数插值，每次执行仍需人类确认。"}),
         )
     }
     pub(crate) async fn save_tool_settings(

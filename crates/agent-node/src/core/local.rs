@@ -187,16 +187,32 @@ pub(super) async fn execute(
             return;
         }
     }
-    let history =
-        match conversation::context(state, credential.project_id, command.session_id, message_id)
-            .await
-        {
-            Ok(context) => context,
-            Err(error) => {
-                emit(state, credential, command, "agent.error", &error).await;
-                return;
+    let chat = command.data["capability_project"]
+        .as_str()
+        .map(|g| format!("group:{g}"))
+        .unwrap_or_else(|| format!("session:{}", command.session_id));
+    let source = std::sync::Arc::new(super::indexed_history::IndexedHistory::new(
+        credential.project_id,
+        chat,
+        Some(credential.client_id.clone()),
+    ));
+    let before = command.data["history_before"]
+        .as_str()
+        .map(str::to_owned)
+        .or_else(|| message_id.map(|id| id.to_string()));
+    let history = match source.context_prompt(before).await {
+        Ok(history) => {
+            if command.data["capability_project"].is_string() {
+                String::new()
+            } else {
+                history
             }
-        };
+        }
+        Err(error) => {
+            emit(state, credential, command, "agent.error", &error).await;
+            return;
+        }
+    };
     let definition = state
         .store
         .get(
@@ -209,7 +225,7 @@ pub(super) async fn execute(
         .and_then(|row| row["role"].as_str())
         .unwrap_or(&credential.role);
     let prompt = format!(
-        "Your registered role: {}\nTask: {}\n{}",
+        "Your registered role: {}\nTask: {}\nLatest user request:\n{}",
         role,
         command.data["title"].as_str().unwrap_or("User request"),
         command.data["instruction"]
@@ -217,10 +233,17 @@ pub(super) async fn execute(
             .or_else(|| command.data["content"].as_str())
             .unwrap_or_default()
     );
-    let response_instructions = definition
-        .as_ref()
-        .and_then(|r| r["response_instructions"].as_str())
-        .unwrap_or(super::response_instructions::DEFAULT);
+    let response_instructions = match super::response_instructions::current(
+        definition
+            .as_ref()
+            .and_then(|r| r["response_instructions"].as_str()),
+    ) {
+        Ok(text) => text,
+        Err(error) => {
+            emit(state, credential, command, "agent.error", &error).await;
+            return;
+        }
+    };
     let prompt = format!(
         "Registered Agent response requirements:\n{response_instructions}\n{history}\n{prompt}"
     );
@@ -289,15 +312,6 @@ pub(super) async fn execute(
                     )
                     .await?,
                 )?;
-                let chat = command.data["capability_project"]
-                    .as_str()
-                    .map(|g| format!("group:{g}"))
-                    .unwrap_or_else(|| format!("session:{}", command.session_id));
-                let source = std::sync::Arc::new(super::log_history::LogHistory::new(
-                    state.store.logs().clone(),
-                    credential.project_id,
-                    chat,
-                ));
                 agent_runtime::context::HistoryAccess::scope(
                     source,
                     runtime.run_events(&prompt, &mut move |chunk| {

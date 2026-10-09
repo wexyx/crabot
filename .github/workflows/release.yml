@@ -1,4 +1,4 @@
-name: Release Carbot
+name: Release Crabot
 on:
   push:
     tags: ['v*']
@@ -7,7 +7,7 @@ permissions:
 jobs:
   build:
     env:
-      CARBOT_RELEASE_VERSION: ${{ github.ref_name }}
+      CRABOT_RELEASE_VERSION: ${{ github.ref_name }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,11 +31,11 @@ jobs:
       - run: pnpm install --frozen-lockfile && pnpm web:build
       - run: cargo +stable build --release --locked -p agent-node
       - name: Verify embedded release version
-        run: test "$(target/release/agent-node --version)" = "Carbot $CARBOT_RELEASE_VERSION"
+        run: test "$(target/release/agent-node --version)" = "Crabot $CRABOT_RELEASE_VERSION"
       - run: bash scripts/package-release.sh '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
         with:
-          name: carbot-${{ matrix.target }}
+          name: crabot-${{ matrix.target }}
           path: dist/*
   publish:
     needs: build
@@ -51,4 +51,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" dist/* --draft --title "Carbot $RELEASE_TAG" --generate-notes
+        run: gh release create "$RELEASE_TAG" dist/* --draft --title "Crabot $RELEASE_TAG" --generate-notes

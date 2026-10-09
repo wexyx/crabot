@@ -16,8 +16,8 @@ export function exampleArguments(schema={},name=''){
   if(type==='boolean')return false
   if(type==='null')return null
   if(key==='command')return 'pwd'
-  if(key==='code')return 'print("Hello, Carbot")'
-  if(key==='path')return name==='list_files'?'.':'./README.md'
+  if(key==='code')return 'print("Hello, Crabot")'
+  if(key==='path')return './README.md'
   if(key==='url')return 'https://example.com'
   if(key==='from_line')return 1
   if(key==='to_line')return 20

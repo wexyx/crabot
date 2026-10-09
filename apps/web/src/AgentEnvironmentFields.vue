@@ -31,7 +31,7 @@ function remove(index){rows.value.splice(index,1);publish()}
    <el-table-column width="72" fixed="right"><template #default="{$index}"><el-button text type="danger" @click="remove($index)">删除</el-button></template></el-table-column>
   </el-table>
   <small v-if="error" role="alert">{{error}}</small>
-  <small>仅当前 Agent 及其工具进程使用；不会修改全局环境。已保存的值不回显，本地明文保存。HOME、临时目录与 CARBOT_* 等运行目录变量不可覆盖。</small>
+  <small>仅当前 Agent 及其工具进程使用；不会修改全局环境。已保存的值不回显，本地明文保存。HOME、临时目录与 CRABOT_* 等运行目录变量不可覆盖。</small>
  </section>
 </template>
 <style scoped>

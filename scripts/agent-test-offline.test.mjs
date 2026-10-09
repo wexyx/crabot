@@ -6,7 +6,7 @@ import {join} from 'node:path'
 import {start,stop,request,history,policy} from './admin-fixture.mjs'
 
 test('test chat runs a stopped local Agent without enabling normal work',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-offline-test-'));let server
+ const dir=await mkdtemp(join(tmpdir(),'crabot-offline-test-'));let server
  try{
   server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
   const p=(await request(server,'/v1/repl')).projects[0].id,base=`/v1/repl/${p}`

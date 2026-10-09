@@ -1,6 +1,7 @@
 <script setup>
 import {ref,onBeforeUnmount,computed} from 'vue'
 import {exampleArguments} from './tool-examples.js'
+const emit=defineEmits(['completed'])
 const props=defineProps({request:Function,project:String,group:String,scope:String,agent:String,name:String,initialArguments:Object,schema:Object,disabled:Boolean})
 const example=computed(()=>props.initialArguments??exampleArguments(props.schema||{type:'object',properties:{args:{type:'array',items:{type:'string'}}}},props.name))
 const args=ref(JSON.stringify(example.value,null,2)),run=ref(null),error=ref(''),submitting=ref(false),approvals=ref([]),deciding=ref(false)
@@ -13,7 +14,7 @@ async function poll(){if(polling||!alive||!run.value)return;polling=true;try{
  if(!alive)return;run.value=result
  if(result.status==='running'){
   const pending=await props.request('/v1/workspace/approvals');if(alive)approvals.value=pending.requests.filter(a=>a.correlation_id===result.id)
- }else{clearInterval(timer);approvals.value=[]}
+ }else{clearInterval(timer);approvals.value=[];if(result.status==='completed')emit('completed',result.output)}
  }catch(e){if(alive)error.value=e.message}finally{polling=false}}
 async function start(){error.value='';let argumentsValue;try{argumentsValue=JSON.parse(args.value);if(!argumentsValue||Array.isArray(argumentsValue)||typeof argumentsValue!=='object')throw new Error('参数必须是 JSON 对象。')}catch(e){error.value=e.message;return}submitting.value=true;try{const row=await props.request('/v1/repl/'+props.project+'/tool-config/'+props.scope+'/'+encodeURIComponent(props.agent)+'/tests',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:props.name,arguments:argumentsValue,group:props.group||undefined})});if(!alive){props.request('/v1/repl/'+props.project+'/tool-tests/'+row.id,{method:'DELETE'}).catch(()=>{});return}run.value=row;await poll();if(active.value)timer=setInterval(poll,600)}catch(e){error.value=e.message}finally{submitting.value=false}}
 async function cancel(){try{await props.request('/v1/repl/'+props.project+'/tool-tests/'+run.value.id,{method:'DELETE'});await poll()}catch(e){error.value=e.message}}

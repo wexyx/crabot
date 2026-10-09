@@ -15,17 +15,17 @@ import time
 from terminal_screen import snapshot
 
 root = pathlib.Path(__file__).resolve().parent.parent
-version = subprocess.check_output([str(root / "target/debug/agent-node"), "--version"]).strip().removeprefix(b"Carbot ")
-directory = tempfile.mkdtemp(prefix="carbot-terminal-")
+version = subprocess.check_output([str(root / "target/debug/agent-node"), "--version"]).strip().removeprefix(b"Crabot ")
+directory = tempfile.mkdtemp(prefix="crabot-terminal-")
 pid, master = pty.fork()
 if pid == 0:
     os.chdir(directory)
     os.execve(str(root / "target/debug/agent-node"), ["agent-node", "--cli"], {
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"), "TERM": "xterm-256color",
-        "BIND_ADDR": "127.0.0.1:0", "ADMIN_AGENT_PROVIDER": "mock", "CARBOT_DATA_DIR": directory,
+        "BIND_ADDR": "127.0.0.1:0", "ADMIN_AGENT_PROVIDER": "mock", "CRABOT_DATA_DIR": directory,
     })
 
-columns = int(os.environ.get("CARBOT_TEST_COLUMNS", "110"))
+columns = int(os.environ.get("CRABOT_TEST_COLUMNS", "110"))
 fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 28, columns, 0, 0))
 output = bytearray()
 position = 0
@@ -48,7 +48,8 @@ def send(text):
 try:
     wait_for("请求批准")
     visible = snapshot(output, 28, columns)
-    assert visible[0].startswith("┌"), "startup lost its top border: " + repr(visible[:3])
+    assert "█" in visible[0], "startup lost its first wordmark row: " + repr(visible[:3])
+    assert not any("┌" in row or "└" in row for row in visible), "wordmark should not have a frame"
     assert visible[-1].startswith("│"), "session info must stay on the last row"
     assert b"\x1b[2J\x1b[1;1H" in output, "startup must clear the screen and move to the top"
     assert output.index(b"\x1b[2J") < output.index(version), "clear before the banner"
@@ -60,17 +61,39 @@ try:
     assert version in output and b"http://127.0.0.1:" in output
     assert b"\x1b[?1000h" not in output, "native selection must be enabled by default"
     assert b"\x1b[" in output, "missing terminal styling"
+    send("/")
+    wait_for("↑/↓ 选择")
+    send("\x1b[B")
+    wait_for("› /chat")
+    send("\t")
+    wait_for("/chat ")
+    send("\r")
+    wait_for("选择聊天")
+    send("\r")
+    wait_for("group")
+    assert b"\x1b[48;5;6m" in output or b"\x1b[46m" in output, "selected command must be highlighted"
     send("/admin-c\t")
     wait_for("/admin-config ")
     send("\r")
-    wait_for("配置 1/6")
-    for value, prompt in [("carbot", "厂商"), ("ollama", "模型名称"), ("fixture", "接口地址"), ("-", "协议"), ("-", "API Key")]:
+    wait_for("Crabot · 内置 Agent")
+    # The current mock is not a user-selectable runner; Enter picks Crabot.
+    send("\r")
+    wait_for("› OpenAI")
+    for _ in range(6):
+        send("\x1b[B")
+        time.sleep(0.06)
+    wait_for("› Ollama")
+    send("\r")
+    wait_for("模型名称")
+    for value, prompt in [("fixture", "接口地址"), ("-", "协议"), ("", "系统提示词"), ("-", "API Key")]:
         send(value + "\r")
         wait_for(prompt)
     send("tty-secret-fixture")
     wait_for("******************")
     assert b"tty-secret-fixture" not in output, "secret appeared in terminal"
     send("\r")
+    wait_for("环境变量 JSON")
+    send("-\r")
     wait_for("配置已保存并生效")
     settings = json.loads((pathlib.Path(directory) / "default-agent.json").read_text())
     assert settings["MODEL_API_KEY"] == "tty-secret-fixture"

@@ -88,11 +88,22 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                                 continue;
                             }
                             if !(ctrl&&key.code==KeyCode::Char('c')) {exit_armed=None;}
+                            if let Some(config)=wizard.as_mut() {
+                                if editor.text().is_empty() {
+                                    let direction=match key.code {KeyCode::Up|KeyCode::PageUp=>Some(false),KeyCode::Down|KeyCode::PageDown|KeyCode::Tab=>Some(true),_=>None};
+                                    if direction.is_some_and(|forward|config.move_choice(forward)){continue;}
+                                }
+                            }
+                            if wizard.is_none() && editor.text().is_empty() {
+                                let direction=match key.code {KeyCode::Up|KeyCode::PageUp=>Some(false),KeyCode::Down|KeyCode::PageDown=>Some(true),_=>None};
+                                if direction.is_some_and(|forward|controller.move_chat_choice(forward)){continue;}
+                            }
                             match key.code {
 
                                 KeyCode::Char('l') if ctrl=>{transcript.clear();tools=Default::default();scroll=0;continue;},
                                 KeyCode::Esc|KeyCode::Char('c') if key.code==KeyCode::Esc||ctrl=>{
                                     if wizard.take().is_some(){editor.clear();status="配置已取消，未保存。".into();}
+                                    else if controller.cancel_chat_choice(){editor.clear();status="已取消选择聊天。".into();}
                                     else if busy {controller.interrupt().await?;status="正在打断…".into();}
                                     else if !editor.text().is_empty(){editor.clear();exit_armed=Some(Instant::now());status="输入已清空；再按 Ctrl+C 退出。".into();}
                                     else if ctrl && !submitting && controller.label()=="admin" && controller.can_back() {
@@ -104,6 +115,7 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                                 },
                                 KeyCode::Char('d') if ctrl&&editor.text().is_empty()=>break,
                                 KeyCode::Enter if !key.modifiers.intersects(KeyModifiers::ALT|KeyModifiers::SHIFT)=>{
+                                    if wizard.is_none() && editor.complete_partial() { continue; }
                                     let line=editor.submit(wizard.is_none());
                                     if let Some(config)=wizard.as_mut() {
                                         if line.trim()=="/cancel" {wizard=None;status="配置已取消。".into();continue;}
@@ -115,16 +127,17 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                                             // A numbered model list belongs in the scrollback,
                                             // which this inline REPL keeps, not in the status line.
                                             Ok(None)=>{let listing=config.catalog_text();if !listing.is_empty(){transcript.push_str(&format!("\n{listing}"));}status=config.prompt()},
-                                            Err(e)=>status=e,
+                                            Err(e)=>{transcript.push_str(&format!("\n配置无效：{e}\n"));status=e;},
                                         }
                                         continue;
                                     }
-                                    if line.trim().is_empty(){continue;}
+                                    let choosing_chat=controller.choosing_chat();
+                                    if line.trim().is_empty()&&!choosing_chat{continue;}
                                     if let Ok(super::commands::Command::Tools(index))=super::commands::parse(&line){transcript.push_str(&format!("\n{}\n",tools.details(index)));continue;}
                                     if submitting {editor.insert(&line);status="上一条请求正在提交，请稍候。".into();continue;}
-                                    if busy&&!line.starts_with('/') {editor.insert(&line);status="当前任务仍在运行，Esc 打断后可修改要求。".into();continue;}
+                                    if busy&&!choosing_chat&&!line.trim_start().starts_with('/') {editor.insert(&line);status="当前任务仍在运行，Esc 打断后可修改要求。".into();continue;}
                                     transcript.push_str(&format!("\n你：{line}\n"));scroll=0;
-                                    if !line.starts_with('/'){pending_echo=Some(line.clone());busy=true;started=Instant::now();}
+                                    if !choosing_chat&&!line.trim_start().starts_with('/'){pending_echo=Some(line.clone());busy=true;started=Instant::now();}
                                     status="正在提交…".into();submitting=true;
                                     _screen.draw(&controller.heading(),&transcript,&status,&session_info,&update_status.borrow().clone(),&editor,false,scroll,None,&tools)?;
                                     let mut next=controller.clone();let tx=actions_tx.clone();
@@ -148,9 +161,9 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                             if action.navigate{watcher.abort();let(p,id,b)=controller.view();(updates,watcher)=output::subscribe(manager.clone(),p,id,b,action.replay).await;presentation=Presentation::default();tools=Default::default();transcript.clear();busy=false;pending_echo=None;}
                             if action.sent {if busy{status="等待模型响应…".into();}}
                             else if action.navigate {status=action.text;}
-                            else {status="就绪".into();if !action.text.is_empty(){transcript.push_str(&format!("{}\n",action.text));}}
+                            else {status="就绪".into();if !action.text.is_empty()&&!controller.choosing_chat(){transcript.push_str(&format!("{}\n",action.text));}}
                         },
-                        Err(e)=>{pending_echo=None;busy=false;status="操作失败，可修改后重试。".into();transcript.push_str(&format!("\n错误：{e}\n"));},
+                        Err(e)=>{if pending_echo.take().is_some(){busy=false;}status="操作失败，可修改后重试。".into();transcript.push_str(&format!("\n错误：{e}\n"));},
                     }
                 },
                 Some(result)=decisions_rx.recv()=>{
@@ -186,7 +199,8 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                         let heading=wizard.as_ref().map(|w|w.prompt()).unwrap_or_else(||controller.heading());
                         let shown=if let Some(w)=wizard.as_ref(){w.prompt()}else if busy {let tool=tools.status((started.elapsed().as_secs()/2) as usize).map(|value|format!(" · {}",value.split_once(" · ").map(|(_,name)|name).unwrap_or(&value))).unwrap_or_default();format!("执行中 · {:>6.1}s · Esc 打断{}",started.elapsed().as_secs_f64(),tool)}else{status.clone()};
                         let update=update_status.borrow().clone();
-                        _screen.draw(&heading,&transcript,&shown,&session_info,&update,&editor,secret,scroll,if wizard.is_none(){dialog.text()}else{None}.as_deref(),&tools)?;dirty=false;
+                        let panel=if let Some(config)=wizard.as_ref(){let menu=config.choice_menu();(!menu.is_empty()).then_some(menu)}else{dialog.text().or_else(||if editor.text().starts_with('/'){None}else{controller.chat_menu()})};
+                        _screen.draw(&heading,&transcript,&shown,&session_info,&update,&editor,secret,scroll,panel.as_deref(),&tools)?;dirty=false;
                     }
                 }
             }

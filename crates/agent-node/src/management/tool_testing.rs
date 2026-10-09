@@ -3,7 +3,7 @@ use agent_runtime::{
     skills::ExecutionPolicy,
     tools::{ToolContext, ToolFactory, ToolSession},
 };
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::sync::Arc;
 use uuid::Uuid;
 impl Manager {
@@ -81,15 +81,6 @@ impl Manager {
                 name.clone(),
                 workspace.scope(async move {
                     let mut session = ToolSession::default();
-                    if name == "python_run" {
-                        registry
-                            .execute(
-                                "skill_read",
-                                &json!({"skill_id":args["skill_id"]}),
-                                &mut session,
-                            )
-                            .await?;
-                    }
                     registry.execute(&name, &args, &mut session).await
                 }),
             )

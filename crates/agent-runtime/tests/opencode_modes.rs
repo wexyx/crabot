@@ -1,7 +1,7 @@
 //! Exercises both OpenCode service modes through the real runtime, because the shared
 //! mode's failure was a silent hang rather than an error, which no unit test would see.
 //!
-//! Opt-in like the other OpenCode live tests: `CARBOT_OPENCODE_E2E=1` and `OPENCODE_MODEL`.
+//! Opt-in like the other OpenCode live tests: `CRABOT_OPENCODE_E2E=1` and `OPENCODE_MODEL`.
 
 use agent_runtime::config::{OpenCodeConfig, RuntimeConfig};
 use agent_runtime::{RuntimeFactory, RuntimeKind};
@@ -26,8 +26,8 @@ async fn run(standalone: bool) -> Result<String, String> {
 
 #[tokio::test]
 async fn both_service_modes_return_an_answer() {
-    if std::env::var("CARBOT_OPENCODE_E2E").as_deref() != Ok("1") {
-        eprintln!("skipped: set CARBOT_OPENCODE_E2E=1 to exercise the real OpenCode CLI");
+    if std::env::var("CRABOT_OPENCODE_E2E").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRABOT_OPENCODE_E2E=1 to exercise the real OpenCode CLI");
         return;
     }
     let private = run(true).await;

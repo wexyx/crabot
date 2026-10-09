@@ -51,6 +51,7 @@ watch(()=>[props.messages,props.running],async()=>{await nextTick();if(!loadingO
           </el-collapse-item></el-collapse>
         </div>
         <p v-else-if="r.type==='status'" class="turn-status" :title="r.text">{{r.text}}</p>
+        <div v-else-if="r.type==='summary'" class="turn-status summary-line" :title="r.text"><span class="summary-mark">早期对话已压缩为摘要</span><span class="summary-text">{{r.text}}</span></div>
         <div v-else :class="['message-row',['user','message.created'].includes(r.type)?'from-user':'from-agent']">
           <el-avatar class="avatar" :size="32" shape="square">{{['user','message.created'].includes(r.type)?'我':(r.label||'AI').slice(0,2)}}</el-avatar>
           <div class="message-content"><span class="sender">{{r.label}}<time v-if="r.timestamp" :datetime="r.timestamp" :title="new Date(r.timestamp).toLocaleString()">{{messageClock(r.timestamp)}}</time></span><div :class="['bubble',{'failure':['failed','agent.error'].includes(r.type)}]"><MessageBody :text="r.text" /></div></div>
@@ -72,4 +73,4 @@ watch(()=>[props.messages,props.running],async()=>{await nextTick();if(!loadingO
 
 <style scoped>.execution-status{flex-shrink:0;padding:8px 24px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}</style>
 
-<style scoped>.rotating-status{display:block;min-height:20px;line-height:20px}.turn-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px;margin-block:4px}</style>
+<style scoped>.rotating-status{display:block;min-width:0;flex:1;min-height:20px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.turn-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px;margin-block:4px}.summary-line{display:flex;gap:8px;color:var(--muted);padding:6px 10px;background:color-mix(in srgb,var(--line) 30%,transparent);border-radius:8px;margin-block:8px}.summary-mark{flex-shrink:0;font-size:12px}.summary-text{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style>

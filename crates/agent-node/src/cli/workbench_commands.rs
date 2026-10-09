@@ -21,7 +21,7 @@ fn operation(op: &str, input: Value) -> Command {
 pub(super) fn parse(head: &str, tail: &str) -> Result<Option<Command>, String> {
     let (action, rest) = split(tail);
     Ok(Some(match head {
-        "agents" => operation("agents.list", json!({"contextual":true})),
+        "agents" => operation("agents.list", json!({})),
         "connect" => {
             if tail.trim().is_empty() {
                 return Err("用法：/connect https://upstream.example".into());
@@ -93,6 +93,7 @@ pub(super) fn parse(head: &str, tail: &str) -> Result<Option<Command>, String> {
                     json!({"id":id,"expected_version":version.parse::<u64>().map_err(|_|"需要版本号")?}),
                 )
             }
+            "" => operation("agents.list", json!({})),
             _ => return Ok(None), // Existing /agent PATH role/start/... within a group.
         },
         "project" => match action {

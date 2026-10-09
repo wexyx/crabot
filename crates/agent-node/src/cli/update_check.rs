@@ -23,7 +23,7 @@ pub(super) fn newer(current: &str, latest: &str) -> bool {
     }
 }
 pub(super) async fn check() -> Result<Option<String>, String> {
-    let repo = std::env::var("CARBOT_REPOSITORY").unwrap_or_else(|_| "wexyx/crabot".into());
+    let repo = std::env::var("CRABOT_REPOSITORY").unwrap_or_else(|_| "wexyx/crabot".into());
     if repo.split('/').count() != 2
         || repo
             .split('/')
@@ -37,7 +37,7 @@ pub(super) async fn check() -> Result<Option<String>, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .redirect(reqwest::redirect::Policy::none())
-        .user_agent("Carbot-update-check")
+        .user_agent("Crabot-update-check")
         .build()
         .map_err(|e| e.to_string())?;
     let response = client

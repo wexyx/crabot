@@ -29,7 +29,7 @@ impl AgentEnvironment {
             if value.contains('\0') || value.len() > 8192 {
                 return Err("环境变量值不可包含 NUL，且不能超过 8 KiB".into());
             }
-            if key.starts_with("CARBOT_")
+            if key.starts_with("CRABOT_")
                 || key.starts_with("AGENT_")
                 || matches!(
                     key.as_str(),
@@ -46,7 +46,7 @@ impl AgentEnvironment {
                         | "PUPPETEER_CACHE_DIR"
                 )
             {
-                return Err(format!("环境变量 {key} 由 Carbot 管理，不允许覆盖"));
+                return Err(format!("环境变量 {key} 由 Crabot 管理，不允许覆盖"));
             }
         }
         Ok(Self { values })
@@ -172,7 +172,7 @@ mod tests {
         assert!(changed.get("DROP").is_none());
         for raw in [
             r#"{"HOME":"/tmp"}"#,
-            r#"{"CARBOT_DATA_DIR":"/tmp"}"#,
+            r#"{"CRABOT_DATA_DIR":"/tmp"}"#,
             r#"{"1BAD":"x"}"#,
             r#"{"A":42}"#,
         ] {

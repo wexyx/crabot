@@ -17,7 +17,7 @@ pub(super) async fn automatic(
     let secret = secret
         .filter(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()))
         .ok_or_else(|| failure("registration_secret must contain 64 hex digits"))?;
-    let name = name.unwrap_or_else(|| "Carbot".into());
+    let name = name.unwrap_or_else(|| "Crabot".into());
     if name.len() > 255 {
         return Err(failure("name too long"));
     }

@@ -14,6 +14,11 @@ export function conversationView(events) {
     const label=speaker==='default'?'默认 Agent':speaker
     const key=event.invocation_id||((event.message_id||'')+':'+speaker)
     if(event.aggregate===true)continue
+    if(type==='agent.yield'){
+      answers.delete(key);reasoning.delete(key)
+      rows.push({seq:event.seq,type:'status',timestamp,label:'协作',text:label+' '+(text||'已让出本轮'),agent:speaker});continue
+    }
+    if(type==='agent.activity'){rows.push({seq:event.seq,type:'status',timestamp,label:'协作',text});continue}
     if(type==='agent.planning'){
       let row=planning.get(key)
       if(!row){row={seq:event.seq,type:'process',timestamp,label:label+' · 协作规划',text:'',agent:speaker};planning.set(key,row);rows.push(row)}
@@ -32,6 +37,9 @@ export function conversationView(events) {
       let row=reasoning.get(key)
       if(!row){row={seq:event.seq,type:'process',timestamp,label:label+' · 思考过程',name:'reasoning',text:'',agent:speaker,invocation_id:event.invocation_id,pending:true};reasoning.set(key,row);rows.push(row)}
       row.text+=thought;answer=null;continue
+    }
+    if(type==='summary'){
+      rows.push({seq:event.seq,type:'summary',timestamp,text,label:'摘要',compacted:true});continue
     }
     if(type==='context_checkpoint'||type==='agent.context'||type==='agent.progress')continue
     if(type==='text_delta'||type==='agent.delta'){

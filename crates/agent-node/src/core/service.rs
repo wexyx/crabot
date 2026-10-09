@@ -154,7 +154,7 @@ impl Core {
     }
     pub(crate) async fn agent_stop(&self, project: Uuid, id: &str) -> Result<Value, String> {
         if id == "default" {
-            return Err("默认 Agent 随 Carbot 生命周期运行；要取消当前任务请中断会话".into());
+            return Err("默认 Agent 随 Crabot 生命周期运行；要取消当前任务请中断会话".into());
         }
         let _guard = self.lifecycle.lock().await;
         self.project(project).await?;
@@ -241,15 +241,20 @@ impl Core {
             .and_then(|r| r["group_id"].as_str())
             .map(|g| format!("group:{g}"))
             .unwrap_or_else(|| format!("session:{session}"));
-        let rows = self
-            .state
-            .store
-            .logs()
-            .read(project, chat, 0, u64::MAX, 10000)
-            .await?
-            .into_iter()
-            .filter(|r| r["channel"] == format!("session:{session}"))
-            .collect::<Vec<_>>();
+        // Read from the knowledge index for sequential history (display view).
+        let history =
+            crate::core::indexed_history::IndexedHistory::new(project, chat.clone(), None);
+        let (rows, _) = history.rows(None, 0, u64::MAX, 10000).await?;
+        let rows = if run.as_ref().is_some_and(|r| r["group_id"].is_string()) {
+            rows.into_iter()
+                .filter(|r| {
+                    r["payload"]["message_id"] == json!(session)
+                        || r["payload"]["session_id"] == json!(session)
+                })
+                .collect::<Vec<_>>()
+        } else {
+            rows
+        };
         Ok(json!(rows))
     }
     pub(crate) async fn interrupt(&self, project: Uuid, id: Uuid) -> Result<Value, String> {

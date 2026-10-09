@@ -1,21 +1,16 @@
-use super::{executor::ProcessExecutor, native::NativeExecutor, profile::Profile};
-use crate::skills::ExecutionRequest;
+use super::profile::Profile;
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{OnceCell, Semaphore, watch};
 static SERVICE: OnceCell<Arc<ExecutionService>> = OnceCell::const_new();
 
 pub(super) struct ExecutionService {
-    executor: Arc<dyn ProcessExecutor>,
     profiles: HashMap<String, Profile>,
     slots: Arc<Semaphore>,
     stopping: watch::Sender<bool>,
 }
 impl ExecutionService {
-    pub(super) fn new(
-        executor: Arc<dyn ProcessExecutor>,
-        profiles: Vec<Profile>,
-    ) -> Result<Self, String> {
+    pub(super) fn new(profiles: Vec<Profile>) -> Result<Self, String> {
         if profiles.is_empty() || profiles.len() > 16 {
             return Err("execution requires 1..16 profiles".into());
         }
@@ -28,24 +23,12 @@ impl ExecutionService {
         }
         let (stopping, _) = watch::channel(false);
         Ok(Self {
-            executor,
             profiles: selected,
             slots: Arc::new(Semaphore::new(4)),
             stopping,
         })
     }
-    pub(super) async fn execute(
-        self: &Arc<Self>,
-        request: ExecutionRequest,
-    ) -> Result<Value, String> {
-        request.validate()?;
-        let execution = self.clone();
-        self.supervise(request.profile.clone(), move |profile| async move {
-            execution.executor.execute(&request, &profile).await
-        })
-        .await
-    }
-    async fn supervise<F, Fut>(
+    pub(super) async fn supervise<F, Fut>(
         self: &Arc<Self>,
         profile: String,
         execute: F,
@@ -98,26 +81,18 @@ async fn service() -> Result<&'static Arc<ExecutionService>, String> {
         .get_or_try_init(|| async {
             let defaults = r#"[{"id":"default","network":"host","timeout_seconds":120}]"#;
             let profiles = serde_json::from_str(
-                &std::env::var("CARBOT_EXECUTION_PROFILES_JSON")
-                    .or_else(|_| std::env::var("CARBOT_SANDBOX_PROFILES_JSON"))
+                &std::env::var("CRABOT_EXECUTION_PROFILES_JSON")
+                    .or_else(|_| std::env::var("CRABOT_SANDBOX_PROFILES_JSON"))
                     .unwrap_or_else(|_| defaults.into()),
             )
             .map_err(|e| e.to_string())?;
-            Ok(Arc::new(ExecutionService::new(
-                Arc::new(NativeExecutor),
-                profiles,
-            )?))
+            Ok(Arc::new(ExecutionService::new(profiles)?))
         })
         .await
 }
 pub async fn initialize() -> Result<(), String> {
-    if std::env::var("CARBOT_ALLOW_SKILL_PYTHON").as_deref() == Ok("1") {
-        service().await?;
-    }
+    service().await?;
     Ok(())
-}
-pub(crate) async fn execute(request: ExecutionRequest) -> Result<Value, String> {
-    service().await?.execute(request).await
 }
 pub async fn shutdown() {
     if let Some(service) = SERVICE.get() {
@@ -129,11 +104,12 @@ pub(crate) async fn execute_command(
     root: std::path::PathBuf,
     command: String,
     profile: String,
+    environment: std::collections::BTreeMap<String, String>,
 ) -> Result<Value, String> {
     service()
         .await?
         .supervise(profile, move |profile| {
-            super::native::shell::execute(root, command, profile)
+            super::native::shell::execute(root, command, profile, environment)
         })
         .await
 }

@@ -1,13 +1,12 @@
-use crate::skills::{ExecutionPolicy, PythonExecutor, SkillCatalog};
+use crate::skills::{ExecutionPolicy, SkillCatalog};
 use std::path::PathBuf;
 pub struct ToolContext {
     pub(crate) tool_policy: super::ToolPolicy,
     pub(crate) execution: ExecutionPolicy,
     extension: Option<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
-    pub(crate) workspace: Option<crate::workspace::Workspace>,
     pub(crate) root: Option<PathBuf>,
     pub(crate) catalog: SkillCatalog,
-    pub(crate) python: PythonExecutor,
+    index: super::ToolIndex,
 }
 impl ToolContext {
     pub fn with_tool_policy(mut self, policy: super::ToolPolicy) -> Self {
@@ -28,6 +27,11 @@ impl ToolContext {
     pub fn skills(&self) -> &SkillCatalog {
         &self.catalog
     }
+    /// The mirror `find_tools` searches. Filled in by the factory once the registry
+    /// is complete, so it is empty for a context that never became one.
+    pub fn tool_index(&self) -> &super::ToolIndex {
+        &self.index
+    }
     pub fn new(
         root: Option<PathBuf>,
         catalog: SkillCatalog,
@@ -40,18 +44,9 @@ impl ToolContext {
             tool_policy: Default::default(),
             execution: policy.clone(),
             extension: None,
-            workspace: root
-                .clone()
-                .map(|p| {
-                    crate::workspace::Workspace::new(
-                        p,
-                        crate::workspace::OutsideAccess::from_env()?,
-                    )
-                })
-                .transpose()?,
             root: root.clone(),
             catalog,
-            python: PythonExecutor::new(policy, root.unwrap_or_else(crate::config::workdir)),
+            index: super::ToolIndex::new(),
         })
     }
 }

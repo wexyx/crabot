@@ -43,7 +43,7 @@ esac
 `
 
 test('the picker is offered the priced catalog, free models first',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-oc-models-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-oc-models-'))
   let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'opencode',OPENCODE_BIN:await fakeCli(dir,priced)})
@@ -58,7 +58,7 @@ test('the picker is offered the priced catalog, free models first',async()=>{
 })
 
 test('a CLI that cannot price models still lists them without calling them free',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-oc-fallback-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-oc-fallback-'))
   let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'opencode',OPENCODE_BIN:await fakeCli(dir,identifiersOnly)})
@@ -71,7 +71,7 @@ test('a CLI that cannot price models still lists them without calling them free'
 })
 
 test('a signed-out OpenCode is reported as such instead of an empty picker',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-oc-signedout-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-oc-signedout-'))
   let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'opencode',OPENCODE_BIN:await fakeCli(dir,noModels)})
@@ -84,25 +84,25 @@ test('a signed-out OpenCode is reported as such instead of an empty picker',asyn
 // Discovery asks the local CLI, so it must work while the operator is still
 // choosing a runner and while a per-Agent override names its own launcher.
 test('the picker works whatever runner is currently saved',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-oc-othrunner-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-oc-othrunner-'))
   let server
   try{
     const opencode=await fakeCli(dir,priced)
-    // carbot additionally demands a model name, which discovery must not depend on.
+    // crabot additionally demands a model name, which discovery must not depend on.
     for(const provider of ['mock','codex','claude','opencode']){
       server=await start(dir,{ADMIN_AGENT_PROVIDER:provider,OPENCODE_BIN:opencode})
       const catalog=await request(server,path)
       assert.equal(catalog.models.length,2,`runner ${provider} refused discovery`)
       await stop(server)
     }
-    // carbot also demands its own credentials, none of which discovery may need.
-    server=await start(dir,{ADMIN_AGENT_PROVIDER:'carbot',MODEL_PROVIDER:'ollama',MODEL_NAME:'fixture',OPENCODE_BIN:opencode})
-    assert.equal((await request(server,path)).models.length,2,'runner carbot refused discovery')
+    // crabot also demands its own credentials, none of which discovery may need.
+    server=await start(dir,{ADMIN_AGENT_PROVIDER:'crabot',MODEL_PROVIDER:'ollama',MODEL_NAME:'fixture',OPENCODE_BIN:opencode})
+    assert.equal((await request(server,path)).models.length,2,'runner crabot refused discovery')
   }finally{await stop(server);await rm(dir,{recursive:true,force:true})}
 })
 
 test('a per-Agent launcher overrides the saved one for discovery',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-oc-agentbin-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-oc-agentbin-'))
   let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'opencode',OPENCODE_BIN:await fakeCli(dir,priced)})
@@ -117,7 +117,7 @@ test('a per-Agent launcher overrides the saved one for discovery',async()=>{
 })
 
 test('a missing launcher is reported as a bad gateway, not a runner error',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-oc-nolauncher-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-oc-nolauncher-'))
   let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
@@ -128,7 +128,7 @@ test('a missing launcher is reported as a bad gateway, not a runner error',async
 })
 
 test('a saved model survives the runner switch that a picker implies',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-oc-saved-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-oc-saved-'))
   let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'opencode',OPENCODE_BIN:await fakeCli(dir,priced)})

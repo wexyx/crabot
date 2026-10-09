@@ -16,9 +16,9 @@ function show(){open.value=true;directory.value=null;browse(props.modelValue)}
 function select(){emit('update:modelValue',directory.value.path);open.value=false}
 </script>
 <template>
- <div class="directory-field"><el-input :model-value="modelValue" readonly placeholder="继承 Carbot 启动目录" aria-label="项目工作目录"/><el-button @click="show" :icon="Folder">选择文件夹</el-button><el-button v-if="modelValue" text @click="emit('update:modelValue','')">恢复默认</el-button></div>
+ <div class="directory-field"><el-input :model-value="modelValue" readonly placeholder="继承 Crabot 启动目录" aria-label="项目工作目录"/><el-button @click="show" :icon="Folder">选择文件夹</el-button><el-button v-if="modelValue" text @click="emit('update:modelValue','')">恢复默认</el-button></div>
  <el-dialog v-model="open" title="选择工作目录" width="min(620px,94vw)" append-to-body>
-  <p class="directory-note">浏览 Carbot 所在机器的文件夹；选择目录不会立即执行任务或授予目录外访问权限。</p>
+  <p class="directory-note">浏览 Crabot 所在机器的文件夹；选择目录不会立即执行任务或授予目录外访问权限。</p>
   <el-alert v-if="error" type="error" :title="error" :closable="false"/>
   <div class="directory-toolbar"><el-button :icon="ArrowUp" :disabled="busy||!directory?.parent" @click="browse(directory.parent)">上一级</el-button><el-button :disabled="busy" @click="browse()">启动目录</el-button></div>
   <p class="directory-path">{{directory?.path||'尚未选择'}}</p>

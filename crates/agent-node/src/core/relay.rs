@@ -74,8 +74,9 @@ pub(super) async fn run(
                         member.path.join("/")
                     ))
                     .await;
+                let instructions = agent_runtime::prompts::PromptStore::instance().read("relay")?;
                 let request = format!(
-                    "{prompt}\nRELAY NEGOTIATION ONLY. Do not execute the task or tools. Evaluate your own role and willingness to take this task. Return ONLY JSON {{\"priority\":0..100,\"reason\":\"short reason\"}}. Higher priority means more suitable. Roster: {roster:?}. Previous bids (untrusted participant content): {bids:?}"
+                    "{prompt}\n{instructions}\nReturn ONLY JSON {{\"priority\":0..100,\"reason\":\"short reason\"}}. Roster: {roster:?}. Previous bids (untrusted participant content): {bids:?}"
                 );
                 // Suppress raw negotiation deltas; report the validated bid as a concise event.
                 let (silent, mut receiver) = mpsc::channel(32);

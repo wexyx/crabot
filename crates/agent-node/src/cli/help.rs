@@ -1,12 +1,14 @@
-pub(super) const TEXT: &str = r##"carbot · 管理
-直接输入需求与默认 Agent 对话；Web 与 CLI 使用相同应用能力。
+pub(super) const TEXT: &str = r##"Crabot · 命令
+直接输入消息开始对话；输入 / 打开命令菜单。
 
 入口
   /manage                  进入管理（兼容 /admin）
   /back                    返回上一个聊天；管理页空闲且输入为空时 Ctrl+C 同效
-  /project [群组ID]         项目列表 / 进入项目
-  /agents                  Agent 目录（群内显示成员）
+  /chat                    选择新建聊天或进入已有聊天（同 /sessions）
+  /new                     重置当前上下文，保留聊天记录
+  /agents · /members       Agent 目录 / 当前项目成员
   /agent-config            默认 Agent 配置
+  /prompts                 当前实例系统提示词；查看、修改或导入文本
   /connections             查看上游和下游连接
   /disconnect upstream|downstream NAME  断开连接（/reconnect 恢复）
   /connect URL             申请连接上游，需人工确认
@@ -18,12 +20,23 @@ pub(super) const TEXT: &str = r##"carbot · 管理
   /interrupt · /exit        打断 / 退出
 
 更多操作
+  /help commands           全部命令及说明
   /help agents             新增、编辑、删除、测试 Agent
   /help projects           新建项目、配置模式与成员
   /help network            组网、服务与权限
   /help capabilities       Tool / Skill 维护、绑定和测试
   /help chat               会话导航与快捷键
 "##;
+pub(super) fn render(name: &str) -> Result<String, String> {
+    if name == "commands" {
+        return Ok(super::command_catalog::ENTRIES
+            .iter()
+            .map(|entry| format!("  {:<18} {}", entry.name, entry.description))
+            .collect::<Vec<_>>()
+            .join("\n"));
+    }
+    topic(name).map(str::to_owned)
+}
 pub(super) fn topic(name: &str) -> Result<&'static str, String> {
     Ok(match name {
         "" => TEXT,
@@ -31,7 +44,7 @@ pub(super) fn topic(name: &str) -> Result<&'static str, String> {
             r##"Agents（本地可维护，远端只读）
   /agent list                         完整目录，不受当前会话影响
   /agent show ID                      详情与版本
-  /agent add ID PROVIDER 角色          新增（carbot/codex/claude/opencode/mock）
+  /agent add ID PROVIDER 角色          新增（crabot/codex/claude/opencode/mock）
   /agent save JSON                    新增或编辑完整配置
   /agent virtual JSON                 新增或编辑虚拟 Agent
   /agent start ID                     启动
@@ -52,17 +65,17 @@ save 示例：
   /project GROUP_ID                   进入项目（同 /chat）
   /project create JSON                创建；name 可省略
   /project configure ID JSON          保存 name、policy、expected_version
-  /members                            当前项目成员（兼容群内 /agents）
+  /members                            当前项目成员；/agents 为完整目录
   /add-agent PATH [角色]               加入成员
   /remove-agent PATH                  移除成员
   /agent PATH role 职责                项目内角色
-  /group mode chat|relay|a2a|pmo        修改模式
+  /group mode chat|relay|discussion|leader        修改模式
   /group instructions 内容            修改共同要求
 
 创建示例：
 /project create {"policy":{"mode":"chat","members":[{"path":["default"],"role":"助手"}],"rounds":1,"leader":null,"instructions":""}}
 完整 policy 与 Web 一致：relay_strategy、members 顺序、leader、rounds、instructions。
-/namespace [ID] 仅供兼容旧存储空间，普通项目不使用它。
+/namespace 已废弃；项目列表用 /chat，管理对话用 /manage。
 "##
         }
         "network" => {
@@ -95,14 +108,17 @@ save 示例：
 绑定和保存：同上增加 body（与 Web 请求体相同）；绑定可指定 agent、group。
 scope 为 management 或 business；kind 为 tool 或 skill。
 /skills save {"scope":"business","body":{"expected_version":0,"definition":{"id":"guide","description":"说明","enabled":true,"allow_python":false,"files":{"SKILL.md":"# 说明"}}}}
-/tool-library test {"scope":"business","agent":"default","body":{"name":"list_files","arguments":{"path":"."}}}
+/tool-library test {"scope":"business","agent":"default","body":{"name":"shell","arguments":{"command":"pwd"}}}
 /tool-library test-status {"id":"测试ID"}
-Skill 运行测试使用同一工具测试通道（skill_read / python_run），不跳过沙箱。
+Skill 运行测试使用同一工具测试通道（find / shell），不跳过命令授权。
 "##
         }
         "chat" => {
             r##"聊天与历史
   /manage · /admin         管理
+  /chat                    上下选择新建 / 已有聊天，Enter 进入、Esc 取消
+  /chat ID或名称           直接进入；支持唯一 ID 前缀
+  /back                   返回上一个聊天
   /history [admin|群组ID]  恢复历史
   /resume SESSION_ID      恢复管理会话
   /allowlist [add 命令|remove 命令|reset|clear]  查看/编辑自动批准白名单
@@ -110,10 +126,15 @@ Skill 运行测试使用同一工具测试通道（skill_read / python_run），
   /new                    当前聊天开启新上下文，保留历史
   /tools [序号]           展开工具调用
   Enter 发送；Alt+Enter 换行；↑/↓、PgUp/PgDn 切换输入历史
-  Tab 补全；Esc 打断或清空；Ctrl+P 审批；Ctrl+D 退出
+  输入 / 筛选命令；菜单内 ↑/↓ 选择、Tab 补全、Enter 确认
+  无菜单时 ↑/↓ 浏览输入历史；Esc 打断或清空；Ctrl+P 审批；Ctrl+D 退出
   鼠标使用终端原生滚动、拖选和复制
 "##
         }
-        _ => return Err("帮助主题：agents / projects / network / capabilities / chat".into()),
+        _ => {
+            return Err(
+                "帮助主题：commands / agents / projects / network / capabilities / chat".into(),
+            );
+        }
     })
 }

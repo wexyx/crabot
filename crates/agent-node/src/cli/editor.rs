@@ -1,45 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-pub(super) const COMMANDS: &[&str] = &[
-    "/help",
-    "/update",
-    "/attach",
-    "/detach",
-    "/manage",
-    "/back",
-    "/members",
-    "/agent-config",
-    "/connections",
-    "/disconnect",
-    "/reconnect",
-    "/connect",
-    "/server",
-    "/namespace",
-    "/capabilities",
-    "/skills",
-    "/tool-library",
-    "/history",
-    "/tools",
-    "/new",
-    "/permissions",
-    "/allowlist",
-    "/resume",
-    "/chat",
-    "/agents",
-    "/add-agent",
-    "/remove-agent",
-    "/agent",
-    "/group",
-    "/admin",
-    "/admin-config",
-    "/project",
-    "/interrupt",
-    "/approve",
-    "/deny",
-    "/allow-path",
-    "/deny-path",
-    "/exit",
-];
 #[derive(Default)]
 pub(super) struct Editor {
     buffer: Vec<char>,
@@ -47,6 +7,7 @@ pub(super) struct Editor {
     history: Vec<String>,
     index: Option<usize>,
     draft: String,
+    selected: usize,
 }
 impl Editor {
     pub(super) fn text(&self) -> String {
@@ -106,8 +67,10 @@ impl Editor {
         self.buffer.clear();
         self.cursor = 0;
         self.index = None;
+        self.selected = 0;
     }
     pub(super) fn insert(&mut self, text: &str) {
+        self.selected = 0;
         for c in text.chars().filter(|c| !c.is_control() || *c == '\n') {
             if self.buffer.len() >= 16384 {
                 break;
@@ -129,16 +92,75 @@ impl Editor {
     }
     pub(super) fn suggestions(&self) -> Vec<&'static str> {
         let value = self.text();
-        if !value.starts_with('/') || value.contains(' ') {
+        if !value.starts_with('/') || value.contains(char::is_whitespace) {
             return vec![];
         }
-        COMMANDS
+        super::command_catalog::suggestions(&value)
+    }
+    pub(super) fn menu(&self) -> Vec<String> {
+        let items = self.suggestions();
+        let selected = self.selected.min(items.len().saturating_sub(1));
+        let start = selected
+            .saturating_sub(2)
+            .min(items.len().saturating_sub(5));
+        items
             .iter()
-            .copied()
-            .filter(|s| s.starts_with(&value))
+            .enumerate()
+            .skip(start)
+            .take(5)
+            .map(|(i, name)| {
+                format!(
+                    "{} {:<16} {}",
+                    if i == selected { "›" } else { " " },
+                    name,
+                    super::command_catalog::description(name)
+                )
+            })
+            .chain((!items.is_empty()).then(|| {
+                format!(
+                    "↑/↓ 选择 · Tab 补全 · Enter 确认 · {}/{}",
+                    selected + 1,
+                    items.len()
+                )
+            }))
             .collect()
     }
+    /// Enter on a partial command completes it first; exact commands execute.
+    pub(super) fn complete_partial(&mut self) -> bool {
+        let items = self.suggestions();
+        let Some(candidate) = items.get(self.selected.min(items.len().saturating_sub(1))) else {
+            return false;
+        };
+        if *candidate == self.text() {
+            return false;
+        }
+        self.clear();
+        self.insert(candidate);
+        self.insert(" ");
+        true
+    }
     pub(super) fn key(&mut self, key: KeyEvent, secret: bool) {
+        let candidates = if secret { vec![] } else { self.suggestions() };
+        if !candidates.is_empty() {
+            match key.code {
+                KeyCode::Up | KeyCode::PageUp => {
+                    self.selected = (self.selected + candidates.len() - 1) % candidates.len();
+                    return;
+                }
+                KeyCode::Down | KeyCode::PageDown => {
+                    self.selected = (self.selected + 1) % candidates.len();
+                    return;
+                }
+                KeyCode::Tab => {
+                    let candidate = candidates[self.selected.min(candidates.len() - 1)];
+                    self.clear();
+                    self.insert(candidate);
+                    self.insert(" ");
+                    return;
+                }
+                _ => self.selected = 0,
+            }
+        }
         match key.code {
             KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => self.cursor = 0,
             KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -173,13 +195,6 @@ impl Editor {
             {
                 self.insert("\n")
             }
-            KeyCode::Tab if !secret => {
-                if let Some(candidate) = self.suggestions().first().copied() {
-                    self.clear();
-                    self.insert(candidate);
-                    self.insert(" ");
-                }
-            }
             KeyCode::Up | KeyCode::PageUp if !secret && !self.history.is_empty() => {
                 if self.index.is_none() {
                     self.draft = self.text();
@@ -209,6 +224,31 @@ impl Editor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn command_menu_selection_completion_and_history_are_separate() {
+        let mut editor = Editor::default();
+        editor.insert("previous message");
+        editor.submit(true);
+        editor.insert("/");
+        assert!(editor.menu()[0].starts_with("› /help"));
+        editor.key(KeyCode::Down.into(), false);
+        assert!(editor.menu()[1].starts_with("› /chat"));
+        assert!(editor.complete_partial());
+        assert_eq!(editor.text(), "/chat ");
+        assert!(!editor.complete_partial());
+        editor.clear();
+        editor.insert("/chat");
+        assert!(!editor.complete_partial());
+        editor.clear();
+        editor.key(KeyCode::Up.into(), false);
+        assert_eq!(editor.text(), "previous message");
+        editor.clear();
+        editor.insert("/chat\tproject");
+        assert!(editor.suggestions().is_empty());
+        editor.clear();
+        editor.insert("/not-a-command");
+        assert!(!editor.complete_partial());
+    }
     #[test]
     fn an_in_progress_mention_is_only_read_at_a_word_boundary() {
         let mut e = Editor::default();

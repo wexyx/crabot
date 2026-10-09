@@ -13,14 +13,14 @@ mod tests {
         let denied = Workspace::new(base.join("root"), OutsideAccess::Deny).unwrap();
         assert!(
             denied
-                .authorize(Path::new("../outside.txt"), "read_file")
+                .authorize(Path::new("../outside.txt"), "read")
                 .await
                 .is_err()
         );
         let workspace = Workspace::new(base.join("root"), OutsideAccess::Ask).unwrap();
         let task = tokio::spawn(async move {
             workspace
-                .authorize(Path::new("../outside.txt"), "read_file")
+                .authorize(Path::new("../outside.txt"), "read")
                 .await
         });
         let expected = base
@@ -56,7 +56,7 @@ mod tests {
             let workspace = Workspace::new(base.join("root"), OutsideAccess::Deny).unwrap();
             assert!(
                 workspace
-                    .authorize(Path::new("link"), "read_file")
+                    .authorize(Path::new("link"), "read")
                     .await
                     .is_err()
             );

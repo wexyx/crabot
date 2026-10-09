@@ -5,7 +5,7 @@ description: Install or troubleshoot requested command-line dependencies on macO
 
 # Package installation
 
-Use `command_run` for commands. Inspect OS, architecture, requested executable and available package manager before installing anything. Reuse existing installations; do not install Homebrew on Linux when the existing system package manager suffices.
+Use `shell` for commands. Inspect OS, architecture, requested executable and available package manager before installing anything. Reuse existing installations; do not install Homebrew on Linux when the existing system package manager suffices.
 
 Before changing the machine, explain the package, trusted source, installation directory and whether administrator privileges or outside-workspace writes are required. Request authorization for installation; permission to investigate is not permission to install. Runtime command and directory approvals still apply. Do not disable the sandbox or change execution permissions yourself.
 

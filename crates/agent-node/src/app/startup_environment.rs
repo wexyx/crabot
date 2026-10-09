@@ -4,7 +4,8 @@ use std::{
 };
 
 const KEYS: &[&str] = &[
-    "CARBOT_DATA_DIR",
+    "CRABOT_DATA_DIR",
+    "CRABOT_HISTORY_BUFFER_MIB",
     "BIND_ADDR",
     "AGENT_MODE",
     "AGENT_NAME",
@@ -12,27 +13,25 @@ const KEYS: &[&str] = &[
     "ADMIN_AGENT_PROVIDER",
     "AGENT_WORKDIR",
     "AGENT_OUTSIDE_ACCESS",
-    "AGENT_PYTHON_BIN",
     "MODEL_PROVIDER",
     "MODEL_NAME",
     "MODEL_API_KEY",
     "MODEL_BASE_URL",
     "MODEL_API",
+    "MODEL_SYSTEM_PROMPT",
     "HARNESS_MAX_TOKENS",
     "MODEL_THINKING",
     "MODEL_REASONING_EFFORT",
     "CONTEXT_MAX_TOKENS",
-    "CONTEXT_RECENT_TURNS",
     "WEB_CONFIG_ORIGINS",
     "WEB_CONFIG_DIR",
-    "CARBOT_ALLOW_SKILL_PYTHON",
-    "CARBOT_EXECUTION_PROFILES_JSON",
-    "CARBOT_EXECUTION_PROFILE",
-    "CARBOT_EXECUTION_ALLOWED_PROFILES",
-    "CARBOT_SANDBOX_PROFILES_JSON",
-    "CARBOT_SANDBOX_PROFILE",
-    "CARBOT_SANDBOX_ALLOWED_PROFILES",
-    "CARBOT_SYSTEM_SKILLS_DIR",
+    "CRABOT_EXECUTION_PROFILES_JSON",
+    "CRABOT_EXECUTION_PROFILE",
+    "CRABOT_EXECUTION_ALLOWED_PROFILES",
+    "CRABOT_SANDBOX_PROFILES_JSON",
+    "CRABOT_SANDBOX_PROFILE",
+    "CRABOT_SANDBOX_ALLOWED_PROFILES",
+    "CRABOT_SYSTEM_SKILLS_DIR",
     "NODE_LINKS_JSON",
     "CODEX_BIN",
     "CLAUDE_BIN",
@@ -43,7 +42,7 @@ const KEYS: &[&str] = &[
 pub(super) struct StartupEnvironment;
 impl StartupEnvironment {
     pub(super) fn launch_dir() -> Result<PathBuf, String> {
-        std::env::var_os("CARBOT_LAUNCH_DIR")
+        std::env::var_os("CRABOT_LAUNCH_DIR")
             .map(PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
@@ -56,25 +55,25 @@ impl StartupEnvironment {
             &cwd,
             explicit_data
                 .or_else(|| {
-                    std::env::var_os("CARBOT_DATA_DIR")
+                    std::env::var_os("CRABOT_DATA_DIR")
                         .filter(|s| !s.is_empty())
                         .map(PathBuf::from)
                 })
                 .or_else(|| {
                     local
-                        .get("CARBOT_DATA_DIR")
+                        .get("CRABOT_DATA_DIR")
                         .filter(|s| !s.is_empty())
                         .map(PathBuf::from)
                 })
-                .unwrap_or_else(|| agent_runtime::paths::user_home().join(".carbot")),
+                .unwrap_or_else(|| agent_runtime::paths::user_home().join(".crabot")),
         );
         let mut values = read(&data_dir.join(".agent.env"))?;
         // The selected instance cannot redirect its own configuration lookup.
-        values.remove("CARBOT_DATA_DIR");
+        values.remove("CRABOT_DATA_DIR");
         values.extend(local);
-        let mut defaults = std::env::var("CARBOT_CONFIG_DEFAULT_KEYS").unwrap_or_default();
+        let mut defaults = std::env::var("CRABOT_CONFIG_DEFAULT_KEYS").unwrap_or_default();
         for (key, value) in values {
-            if key == "CARBOT_DATA_DIR" || std::env::var_os(&key).is_some() {
+            if key == "CRABOT_DATA_DIR" || std::env::var_os(&key).is_some() {
                 continue;
             }
             defaults.push(' ');
@@ -85,10 +84,10 @@ impl StartupEnvironment {
             }
         }
         for (key, bundled) in [
-            ("WEB_CONFIG_DIR", "CARBOT_BUNDLED_WEB_DIR"),
+            ("WEB_CONFIG_DIR", "CRABOT_BUNDLED_WEB_DIR"),
             (
-                "CARBOT_SYSTEM_SKILLS_DIR",
-                "CARBOT_BUNDLED_SYSTEM_SKILLS_DIR",
+                "CRABOT_SYSTEM_SKILLS_DIR",
+                "CRABOT_BUNDLED_SYSTEM_SKILLS_DIR",
             ),
         ] {
             if std::env::var_os(key).is_none() {
@@ -100,8 +99,8 @@ impl StartupEnvironment {
             }
         }
         unsafe {
-            std::env::set_var("CARBOT_DATA_DIR", data_dir);
-            std::env::set_var("CARBOT_CONFIG_DEFAULT_KEYS", defaults);
+            std::env::set_var("CRABOT_DATA_DIR", data_dir);
+            std::env::set_var("CRABOT_CONFIG_DEFAULT_KEYS", defaults);
         }
         Ok(())
     }
@@ -145,7 +144,7 @@ fn read(path: &Path) -> Result<BTreeMap<String, String>, String> {
         let value = if !value.is_empty()
             && matches!(
                 key,
-                "CARBOT_DATA_DIR" | "AGENT_WORKDIR" | "WEB_CONFIG_DIR" | "CARBOT_SYSTEM_SKILLS_DIR"
+                "CRABOT_DATA_DIR" | "AGENT_WORKDIR" | "WEB_CONFIG_DIR" | "CRABOT_SYSTEM_SKILLS_DIR"
             ) {
             absolute(path.parent().unwrap(), value.into())
                 .to_string_lossy()
@@ -167,11 +166,12 @@ mod tests {
         let path = dir.path().join(".agent.env");
         std::fs::write(
             &path,
-            "# comment\nMODEL_API_KEY=literal $(touch nope)\nAGENT_WORKDIR=work\nHOME=ignored\n",
+            "# comment\nMODEL_API_KEY=literal $(touch nope)\nAGENT_WORKDIR=work\nCRABOT_HISTORY_BUFFER_MIB=2048\nHOME=ignored\n",
         )
         .unwrap();
         let values = read(&path).unwrap();
         assert_eq!(values["MODEL_API_KEY"], "literal $(touch nope)");
+        assert_eq!(values["CRABOT_HISTORY_BUFFER_MIB"], "2048");
         assert_eq!(
             values["AGENT_WORKDIR"],
             dir.path().join("work").to_string_lossy()

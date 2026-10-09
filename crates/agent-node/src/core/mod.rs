@@ -1,6 +1,10 @@
 mod approvals;
 mod capabilities;
 pub(crate) mod conversation;
+mod discussion;
+mod discussion_reply;
+#[cfg(test)]
+mod discussion_tests;
 pub(crate) mod error;
 pub(crate) mod events;
 mod group_configuration;
@@ -41,9 +45,11 @@ pub(crate) mod context_reset;
 mod permissions;
 
 mod member_events;
+mod member_response;
+mod prompt_configuration;
 
 mod command_allowlist;
 
-pub(crate) mod log_history;
+pub(crate) mod indexed_history;
 pub(crate) mod recent_context;
 mod response_instructions;

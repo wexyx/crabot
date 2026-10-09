@@ -82,6 +82,17 @@ impl Presentation {
             self.text.clear();
         }
         match kind {
+            "agent.yield" => {
+                self.text.clear();
+                self.streaming = false;
+                let notice = if text.is_empty() {
+                    "已让出本轮"
+                } else {
+                    text
+                };
+                format!("\n[协作] {label} {notice}\n")
+            }
+            "agent.activity" => format!("\n[协作] {text}\n"),
             "user" | "message.created" => {
                 self.text.clear();
                 self.streaming = false;
@@ -111,7 +122,20 @@ impl Presentation {
                     })
                     .unwrap_or_else(|| "tool".into());
                 self.streaming = false;
-                format!("\n[调用工具：{name}]\n")
+                let parsed = serde_json::from_str::<Value>(text).ok();
+                let input = event
+                    .get("input")
+                    .or_else(|| event.get("arguments"))
+                    .or_else(|| {
+                        parsed
+                            .as_ref()
+                            .and_then(|data| data.get("input").or_else(|| data.get("arguments")))
+                    })
+                    .unwrap_or(&Value::Null);
+                format!(
+                    "\n[调用工具：{}]\n",
+                    super::tool_summary::summary(&name, input)
+                )
             }
             "agent.message" => {
                 let output = if self.text.ends_with(text) && self.streaming {
@@ -148,6 +172,11 @@ impl Presentation {
                         .unwrap_or(text)
                 )
             }
+            "summary" => {
+                self.text.clear();
+                self.streaming = false;
+                format!("\n[早期对话已压缩为摘要] {text}\n")
+            }
             // Tool results/checkpoints are retained in history, not dumped into chat.
             _ => String::new(),
         }
@@ -158,6 +187,16 @@ impl Presentation {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn discussion_yield_is_a_notice_not_an_assistant_message() {
+        let mut view = Presentation::default();
+        assert_eq!(view.render(&json!({"type":"agent.yield","agent":"reviewer","invocation_id":"r1","content":"已让出本轮"})), "\n[协作] reviewer 已让出本轮\n");
+        assert_eq!(view.render(&json!({"type":"agent.message","agent":"writer","invocation_id":"w1","content":"处理结果"})), "\n│ writer\n处理结果\n");
+        assert!(
+            view.render(&json!({"type":"agent.message","content":"本轮让出。"}))
+                .contains("│ Agent")
+        );
+    }
     #[test]
     fn speaker_is_a_separate_header_for_streamed_and_complete_messages() {
         let mut view = Presentation::default();
@@ -170,7 +209,7 @@ mod tests {
         let mut view = Presentation::default();
         let mut output = String::new();
         for event in [
-            json!({"type":"tool_started","name":"skill_read"}),
+            json!({"type":"tool_started","name":"find"}),
             json!({"type":"tool_finished","output":"long guide"}),
             json!({"type":"text_delta","text":"我在"}),
             json!({"type":"text_delta","text":"这里"}),

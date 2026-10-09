@@ -25,7 +25,7 @@ impl Core {
                     .is_some_and(|n| n != self.state().node_id)
                 && !connection.sender.is_closed()
             {
-                entries.push(json!({"id":id,"kind":"remote","provider":"carbot","role":connection.role,"online":true,"node_id":connection.node_id,"remote_address":inbound.iter().find(|r|r["project_id"]==json!(project)&&r["client_id"]==id.as_str()).map(|r|r["remote_address"].clone())}));
+                entries.push(json!({"id":id,"kind":"remote","provider":"crabot","role":connection.role,"online":true,"node_id":connection.node_id,"remote_address":inbound.iter().find(|r|r["project_id"]==json!(project)&&r["client_id"]==id.as_str()).map(|r|r["remote_address"].clone())}));
             }
         }
         drop(clients);
@@ -127,7 +127,7 @@ pub(super) async fn validate_members(
             return Err("unknown remote Agent".into());
         }
         if member.path.len() != 1 {
-            return Err("Select a configured local Agent or directly connected Carbot; nested paths cannot be added as project members".into());
+            return Err("Select a configured local Agent or directly connected Crabot; nested paths cannot be added as project members".into());
         }
         let id = &member.path[0];
         let local = locals
@@ -144,7 +144,7 @@ pub(super) async fn validate_members(
         let virtual_agent = virtuals.iter().any(|v| v.key == *id);
         if !local && !remote && !virtual_agent {
             return Err(format!(
-                "Unknown member {id}: configure it in Agent management or connect the remote Carbot first"
+                "Unknown member {id}: configure it in Agent management or connect the remote Crabot first"
             ));
         }
     }

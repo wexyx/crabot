@@ -8,7 +8,7 @@ import {conversationView} from '../apps/web/src/conversation-view.js'
 
 // A two-member group, so a message has somewhere to go other than "everybody".
 async function fixture(name,run){
-  const dir=await mkdtemp(join(tmpdir(),`carbot-at-${name}-`));let server
+  const dir=await mkdtemp(join(tmpdir(),`crabot-at-${name}-`));let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
     const p=(await request(server,'/v1/repl')).projects[0].id,base='/v1/repl/'+p
@@ -24,7 +24,7 @@ test('@name dispatches only to the Agent it addresses',{timeout:30000},async()=>
   await fixture('single',async({server,p,base,group})=>{
     const run=await request(server,base+'/groups/'+group.key+'/messages',{content:'@second 看一下这个错误'})
     await history(server,p,run.id)
-    const logs=await request(server,base+'/chats/'+group.key+'/logs')
+    const logs=await request(server,base+'/chats/'+group.key+'/history')
     const replies=conversationView(logs.events).filter(r=>r.type==='assistant')
     // One member was addressed, so only it answers. Unaddressed would be two.
     assert.deepEqual(replies.map(r=>r.agent),['second'],JSON.stringify(replies))
@@ -46,7 +46,7 @@ test('an @name that is not a member stays prose and the group still answers',{ti
   await fixture('unknown',async({server,p,base,group})=>{
     const run=await request(server,base+'/groups/'+group.key+'/messages',{content:'ping @nobody or mail@example.com'})
     await history(server,p,run.id)
-    const logs=await request(server,base+'/chats/'+group.key+'/logs')
+    const logs=await request(server,base+'/chats/'+group.key+'/history')
     const replies=conversationView(logs.events).filter(r=>r.type==='assistant')
     assert.deepEqual(replies.map(r=>r.agent),['default','second'],JSON.stringify(replies))
   })
@@ -58,7 +58,7 @@ test('the next unaddressed turn reaches the whole group again',{timeout:30000},a
     await history(server,p,addressed.id)
     const next=await request(server,base+'/groups/'+group.key+'/messages',{content:'大家都看一下'})
     await history(server,p,next.id)
-    const logs=await request(server,base+'/chats/'+group.key+'/logs')
+    const logs=await request(server,base+'/chats/'+group.key+'/history')
     const replies=conversationView(logs.events).filter(r=>r.type==='assistant')
     // One addressed reply plus a full-group reply: narrowing must not be permanent.
     assert.deepEqual(replies.map(r=>r.agent),['second','default','second'],JSON.stringify(replies))

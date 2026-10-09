@@ -5,14 +5,14 @@ use agent_runtime::{
 };
 
 #[test]
-fn carbot_name_and_legacy_alias_select_the_same_provider() {
+fn crabot_name_and_legacy_alias_select_the_same_provider() {
     assert_eq!(
-        "carbot".parse::<RuntimeKind>().unwrap(),
-        RuntimeKind::Carbot
+        "crabot".parse::<RuntimeKind>().unwrap(),
+        RuntimeKind::Crabot
     );
     assert_eq!(
         "builtin".parse::<RuntimeKind>().unwrap(),
-        RuntimeKind::Carbot
+        RuntimeKind::Crabot
     );
 }
 
@@ -42,6 +42,7 @@ fn unknown_runtime_and_invalid_explicit_config_fail_at_factory() {
     let config = HarnessConfig {
         environment: Default::default(),
         context: Default::default(),
+        system_prompt: agent_runtime::config::default_crabot_system_prompt().into(),
         api: ModelApi::Chat,
         base: "file:///private".into(),
         key: "fixture".into(),
@@ -50,7 +51,7 @@ fn unknown_runtime_and_invalid_explicit_config_fail_at_factory() {
         deepseek_effort: None,
         root: ".".into(),
     };
-    assert!(RuntimeFactory::from_config(RuntimeConfig::Carbot(config)).is_err());
+    assert!(RuntimeFactory::from_config(RuntimeConfig::Crabot(config)).is_err());
 }
 
 #[cfg(unix)]
@@ -71,7 +72,7 @@ mod cli {
                 .unwrap()
                 .as_nanos();
             let root = std::env::temp_dir().join(format!(
-                "carbot-runtime-{}-{id}-{}",
+                "crabot-runtime-{}-{id}-{}",
                 std::process::id(),
                 NEXT.fetch_add(1, Ordering::Relaxed)
             ));

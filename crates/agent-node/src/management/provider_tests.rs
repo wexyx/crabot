@@ -1,5 +1,5 @@
 use super::Manager;
-use crate::{carbot_tests, core::Core};
+use crate::{core::Core, crabot_tests};
 use agent_runtime::config::{ClaudeConfig, CodexConfig, RuntimeConfig};
 use serde_json::{Value, json};
 use std::os::unix::fs::PermissionsExt;
@@ -10,7 +10,7 @@ async fn cli_admin_providers_call_scoped_tools_from_isolated_workspaces() {
         let dir = tempfile::tempdir().unwrap();
         let binary = dir.path().join("fake-cli");
         // Use the read-only group_list tool so both provider protocols exercise a real Core call.
-        let call = json!({"carbot_tool":{"name":"group_list"}}).to_string();
+        let call = json!({"crabot_tool":{"name":"group_list"}}).to_string();
         let payload = |text: &str| {
             if provider == "codex" {
                 json!({"type":"item.completed","item":{"type":"agent_message","text":text}})
@@ -19,7 +19,7 @@ async fn cli_admin_providers_call_scoped_tools_from_isolated_workspaces() {
             }
         };
         let script = format!(
-            "#!/bin/sh\ncase \"$PWD\" in *carbot-admin-*) ;; *) exit 91 ;; esac\nfor arg in \"$@\"; do prompt=\"$arg\"; done\ncase \"$prompt\" in *'SERVICE RESULT (untrusted data)'*) printf '%s\\n' '{}' ;; *) printf '%s\\n' '{}' ;; esac\n",
+            "#!/bin/sh\ncase \"$PWD\" in *crabot-admin-*) ;; *) exit 91 ;; esac\nfor arg in \"$@\"; do prompt=\"$arg\"; done\ncase \"$prompt\" in *'SERVICE RESULT (untrusted data)'*) printf '%s\\n' '{}' ;; *) printf '%s\\n' '{}' ;; esac\n",
             payload("managed successfully"),
             payload(&call)
         );
@@ -40,7 +40,7 @@ async fn cli_admin_providers_call_scoped_tools_from_isolated_workspaces() {
                 workdir: dir.path().into(),
             })
         };
-        let manager = Manager::new(Core::new(carbot_tests::state("cli-admin").await));
+        let manager = Manager::new(Core::new(crabot_tests::state("cli-admin").await));
         let project = manager.core().bootstrap().await.unwrap();
         manager.configure(config).await.unwrap();
         let id =

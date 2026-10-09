@@ -35,29 +35,7 @@ impl ToolTimeline {
         }
         let e = items[step % items.len()];
         let input = serde_json::from_str::<Value>(&e.input).unwrap_or_default();
-        let command = input["command"]
-            .as_str()
-            .and_then(|s| s.split_whitespace().next())
-            .unwrap_or("");
-        let name = match e.name.as_str() {
-            "command_run" if !command.is_empty() => command
-                .rsplit('/')
-                .next()
-                .unwrap_or(command)
-                .trim_matches(['\'', '"']),
-            "python_run" => "python",
-            name => name,
-        };
-        let name = name
-            .chars()
-            .filter(|c| !c.is_control())
-            .take(24)
-            .collect::<String>();
-        let name = if e.name == "command_run" && !command.is_empty() {
-            format!("command_run · {name}")
-        } else {
-            name
-        };
+        let name = super::tool_summary::summary(&e.name, &input);
         Some(format!(
             "{} · {}",
             if e.pending { "执行中" } else { "已完成" },
@@ -158,5 +136,26 @@ mod tests {
         assert!(tools.details(None).contains("many\nlines"));
         tools.begin_turn();
         assert!(tools.status(0).is_none());
+    }
+
+    #[test]
+    fn live_and_completed_actions_keep_their_arguments_in_the_summary() {
+        let mut tools = ToolTimeline::default();
+        tools.record(&json!({"payload":{"type":"agent.tool.started","content":json!({"name":"find","call_id":"one","arguments":{"target":"history","query":"部署"}}).to_string()}}));
+        assert_eq!(
+            tools.status(0).as_deref(),
+            Some("执行中 · find · 历史 · 部署")
+        );
+        tools.record(&json!({"type":"tool_finished","call_id":"one","output":"done"}));
+        assert_eq!(
+            tools.status(0).as_deref(),
+            Some("已完成 · find · 历史 · 部署")
+        );
+        tools.record(&json!({"type":"tool_started","name":"shell","call_id":"two","input":{"command":"ls -la src"}}));
+        assert_eq!(
+            tools.status(0).as_deref(),
+            Some("执行中 · shell · ls -la src")
+        );
+        assert!(tools.details(None).contains("ls -la src"));
     }
 }

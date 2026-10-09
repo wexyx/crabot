@@ -1,0 +1,20 @@
+[
+ {"name":"find","input":{"target":"skill","id":"browser-automation"},"expected":"find · Skill · browser-automation"},
+ {"name":"find","input":{"target":"tool","query":"shell"},"expected":"find · 工具 · shell"},
+ {"name":"find","input":{"target":"history","query":"部署方案"},"expected":"find · 历史 · 部署方案"},
+ {"name":"find","input":{"target":"history"},"expected":"find · 历史 · 最近记录"},
+ {"name":"find","input":{"target":"skill"},"expected":"find · Skill · 列表"},
+ {"name":"find","input":{},"expected":"find · 资源 · 列表"},
+ {"name":"shell","input":{"command":"ls -la src"},"expected":"shell · ls -la src"},
+ {"name":"shell","input":{"command":"git diff --stat"},"expected":"shell · git diff --stat"},
+ {"name":"shell","input":{"command":"/usr/bin/python3 /Users/leo/.crabot/tmp/skill-abc/check.py"},"expected":"shell · python3 …/skill-abc/check.py"},
+ {"name":"shell","input":"{\"command\":\"python3 scripts/check.py\"}","expected":"shell · python3 scripts/check.py"},
+ {"name":"shell","input":{"command":"  rg\n测试\t src  "},"expected":"shell · rg 测试 src"},
+ {"name":"shell","input":{"command":"curl -H 'Authorization: Bearer secret' https://example.com"},"expected":"shell · curl -H …"},
+ {"name":"shell","input":{"command":"client --token=private"},"expected":"shell · client --token=***"},
+ {"name":"shell","input":{"command":"client --password private"},"expected":"shell · client --password ***"},
+ {"name":"shell","input":{"command":"curl https://user:secret@example.com/path?token=private"},"expected":"shell · curl https://***@example.com/path"},
+ {"name":"shell","input":{"command":"python3 -c 'print(123456789)'"},"expected":"shell · python3 -c …"},
+ {"name":"shell","input":"broken json","expected":"shell"},
+ {"name":"custom","input":{"secret":"do not dump"},"expected":"custom"}
+]

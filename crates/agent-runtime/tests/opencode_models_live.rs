@@ -1,12 +1,12 @@
 //! Exercises the real model discovery against the installed OpenCode CLI.
 //! Not part of the default suite: it needs `opencode` on PATH and a signed-in
-//! account. Set `CARBOT_OPENCODE_MODELS=1` to run it.
+//! account. Set `CRABOT_OPENCODE_MODELS=1` to run it.
 use agent_runtime::config::{OpenCodeCatalogSource, OpenCodeConfig, opencode_models};
 
 #[tokio::test]
 async fn discovers_the_installed_catalog_with_prices() {
-    if std::env::var("CARBOT_OPENCODE_MODELS").as_deref() != Ok("1") {
-        eprintln!("skipped: set CARBOT_OPENCODE_MODELS=1 to exercise the real OpenCode CLI");
+    if std::env::var("CRABOT_OPENCODE_MODELS").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRABOT_OPENCODE_MODELS=1 to exercise the real OpenCode CLI");
         return;
     }
     let config = OpenCodeConfig::from_env();

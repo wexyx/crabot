@@ -5,7 +5,7 @@ description: Extract text from an existing image with Tesseract, checking langua
 
 # Image text recognition
 
-Confirm the image path, requested language and intended output. Use existing image tools when the current tool catalog supports them; otherwise inspect `tesseract --version` and `tesseract --list-langs` through `command_run`. Do not claim the image was visually inspected based only on OCR.
+Confirm the image path, requested language and intended output. Use existing image tools when the current tool catalog supports them; otherwise inspect `tesseract --version` and `tesseract --list-langs` through `shell`. Do not claim the image was visually inspected based only on OCR.
 
 If Tesseract or the language pack is missing, explain the required installation and ask before making changes. Use https://tesseract-ocr.github.io/tessdoc/Installation.html for installation details; reuse the system's package manager and avoid broad upgrades.
 

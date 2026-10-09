@@ -8,6 +8,20 @@ pub(super) struct Theme {
     enabled: bool,
 }
 impl Theme {
+    pub(super) fn write_banner(&self, out: &mut impl Write, text: &str) -> std::io::Result<()> {
+        if !self.enabled || !(text.contains('█') || text.contains('░')) {
+            return self.write(out, text);
+        }
+        for glyph in text.chars() {
+            let color = if matches!(glyph, '█' | '▄' | '▀') {
+                Color::Cyan
+            } else {
+                Color::DarkGrey
+            };
+            queue!(out, SetForegroundColor(color), Print(glyph))?;
+        }
+        queue!(out, ResetColor)
+    }
     pub(super) fn new() -> Self {
         Self {
             enabled: std::env::var_os("NO_COLOR").is_none(),
@@ -34,7 +48,7 @@ impl Theme {
         } else if text.starts_with("[完成]") || text.starts_with("完成") || text.starts_with("就绪")
         {
             Some(Color::Green)
-        } else if text.starts_with("你：") || text.starts_with("❯") || text.starts_with("CARBOT")
+        } else if text.starts_with("你：") || text.starts_with("❯") || text.starts_with("CRABOT")
         {
             Some(Color::Cyan)
         } else if text.starts_with("[调用工具")
@@ -68,6 +82,20 @@ impl Theme {
         }
     }
     pub(super) fn write(&self, out: &mut impl Write, text: &str) -> std::io::Result<()> {
+        if self.enabled
+            && text.starts_with("› ")
+            && !text.starts_with("› 拒绝")
+            && !text.starts_with("› 允许")
+            && !text.starts_with("› 本对话")
+        {
+            return queue!(
+                out,
+                SetBackgroundColor(Color::DarkCyan),
+                SetForegroundColor(Color::White),
+                Print(text),
+                ResetColor
+            );
+        }
         let label = text.strip_prefix("› ").or_else(|| text.strip_prefix("  "));
         if self.enabled
             && label.is_some_and(|s| {

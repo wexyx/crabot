@@ -5,6 +5,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum = "0.8"
 tempfile = "3"
 libc = "0.2"
 uuid = { version = "1", features = ["v4"] }
@@ -21,4 +22,3 @@ agent-protocol = { path = "../agent-protocol" }
 
 [dev-dependencies]
 syn = { version = "2", features = ["full"] }
-axum = "0.8"

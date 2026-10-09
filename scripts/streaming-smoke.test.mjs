@@ -10,7 +10,7 @@ import {start,stop,request} from './admin-fixture.mjs'
 import {createSseDecoder} from '../apps/web/src/agent-api.js'
 
 test('live SSE is prompt, fragments are batched, final state is durable, interruption flushes progress',async t=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-streaming-'))
+  const dir=await mkdtemp(join(tmpdir(),'crabot-streaming-'))
   let calls=0,server
   const model=createServer(async(req,res)=>{
     let text='';for await(const part of req)text+=part
@@ -25,7 +25,7 @@ test('live SSE is prompt, fragments are batched, final state is durable, interru
   })
   model.listen(0,'127.0.0.1');await once(model,'listening')
   try{
-    server=await start(dir,{ADMIN_AGENT_PROVIDER:'carbot',MODEL_PROVIDER:'compatible',MODEL_API:'chat',MODEL_NAME:'fixture',MODEL_API_KEY:'fixture',MODEL_BASE_URL:`http://127.0.0.1:${model.address().port}`})
+    server=await start(dir,{ADMIN_AGENT_PROVIDER:'crabot',MODEL_PROVIDER:'compatible',MODEL_API:'chat',MODEL_NAME:'fixture',MODEL_API_KEY:'fixture',MODEL_BASE_URL:`http://127.0.0.1:${model.address().port}`})
     const info=await request(server,'/v1/repl'),project=info.projects[0].id
     const base=`/v1/admin-agent/${project}/sessions`
     async function run(interrupt){
@@ -53,7 +53,7 @@ test('live SSE is prompt, fragments are batched, final state is durable, interru
       const disk=(await readState(dir)).collections.management_sessions[session.id]
       assert.equal(disk.status,interrupt?'failed':'completed')
       assert.equal(disk.events,undefined)
-      const saved=await request(server,`/v1/repl/${project}/chats/admin/logs?after=${before}`)
+      const saved=await request(server,`/v1/repl/${project}/chats/admin/history?after=${before}`)
       assert.deepEqual(saved.events,events)
       const fragments=events.filter(e=>e.type==='text_delta')
       assert.ok(first<600,'first output should arrive before the whole answer')

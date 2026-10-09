@@ -17,11 +17,11 @@ export async function modelFixture(){
     res.writeHead(200,{'content-type':'text/event-stream'});res.end('data: '+JSON.stringify(chunk)+'\n\ndata: [DONE]\n\n')
   })
   server.listen(0,'127.0.0.1');await once(server,'listening')
-  return {env:{MODEL_PROVIDER:'compatible',MODEL_API:'chat',MODEL_BASE_URL:`http://127.0.0.1:${server.address().port}/v1`,MODEL_NAME:'fixture',MODEL_API_KEY:'fixture',ADMIN_AGENT_PROVIDER:'carbot'},close:()=>new Promise(r=>server.close(r))}
+  return {env:{MODEL_PROVIDER:'compatible',MODEL_API:'chat',MODEL_BASE_URL:`http://127.0.0.1:${server.address().port}/v1`,MODEL_NAME:'fixture',MODEL_API_KEY:'fixture',ADMIN_AGENT_PROVIDER:'crabot'},close:()=>new Promise(r=>server.close(r))}
 }
 export async function start(dir,env={}){
   await mkdir(dir,{recursive:true})
-  const child=spawn(resolve('target/debug/agent-node'),[],{cwd:dir,env:{...process.env,CARBOT_DATA_DIR:dir,AGENT_WORKDIR:resolve('.'),BIND_ADDR:'127.0.0.1:0',ADMIN_TOKEN:'fixture-admin-token',AGENT_MODE:'agent',NODE_LINKS_JSON:'[]',OPENAI_API_KEY:'fixture',ANTHROPIC_API_KEY:'fixture',...env},stdio:['ignore','pipe','pipe']})
+  const child=spawn(resolve('target/debug/agent-node'),[],{cwd:dir,env:{...process.env,CRABOT_DATA_DIR:dir,AGENT_WORKDIR:resolve('.'),BIND_ADDR:'127.0.0.1:0',ADMIN_TOKEN:'fixture-admin-token',AGENT_MODE:'agent',NODE_LINKS_JSON:'[]',OPENAI_API_KEY:'fixture',ANTHROPIC_API_KEY:'fixture',...env},stdio:['ignore','pipe','pipe']})
   let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b)
   for(let i=0;i<240;i++){
     const match=output.match(/(?:Server|Web REPL): (http:\/\/\S+)/)

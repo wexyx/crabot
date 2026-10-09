@@ -8,16 +8,17 @@ import {tmpdir} from 'node:os'
 import {start,stop,request,policy,history,pause} from './admin-fixture.mjs'
 
 test('context compaction bounds requests; /new survives restart without deleting group/admin logs',{timeout:60000},async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-context-')),calls=[]
+ const dir=await mkdtemp(join(tmpdir(),'crabot-context-')),calls=[]
  const model=createServer(async(req,res)=>{
   let raw='';for await(const chunk of req)raw+=chunk
   calls.push(raw)
-  const text=calls.length===1?'OLD_RESULT_'+ '中文'.repeat(30000):'Fixture context complete'
+  const summarizing=JSON.parse(raw).messages.some(m=>typeof m.content==='string'&&m.content.startsWith('COMPACTION TASK:'))
+  const text=summarizing?JSON.stringify({goals:['OLD_USER_MARKER'],constraints:[],decisions:[],completed:['OLD_RESULT_'],pending:[],risks:[],references:[]}):calls.length===1?'OLD_RESULT_'+ '中文'.repeat(30000):'Fixture context complete'
   res.writeHead(200,{'content-type':'text/event-stream'})
   res.end('data: '+JSON.stringify({choices:[{delta:{content:text},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n')
  })
  model.listen(0,'127.0.0.1');await once(model,'listening')
- const env={ADMIN_AGENT_PROVIDER:'carbot',MODEL_PROVIDER:'compatible',MODEL_API:'chat',MODEL_NAME:'fixture',MODEL_API_KEY:'fixture',MODEL_BASE_URL:`http://127.0.0.1:${model.address().port}/v1`,CONTEXT_MAX_TOKENS:'65536',CONTEXT_STRATEGY:'extractive'}
+ const env={ADMIN_AGENT_PROVIDER:'crabot',MODEL_PROVIDER:'compatible',MODEL_API:'chat',MODEL_NAME:'fixture',MODEL_API_KEY:'fixture',MODEL_BASE_URL:`http://127.0.0.1:${model.address().port}/v1`,CONTEXT_MAX_TOKENS:'65536',CONTEXT_STRATEGY:'extractive'}
  let server
  try{
   server=await start(dir,env)
@@ -40,7 +41,7 @@ test('context compaction bounds requests; /new survives restart without deleting
   await stop(server);server=await start(dir,env)
   await send('NEW_REQUEST_KEEP')
   assert.doesNotMatch(calls.at(-1),/OLD_USER_MARKER|OLD_RESULT_|LATEST_REQUEST_KEEP|OTHER_GROUP_MARKER/)
-  const logs=await request(server,`${base}/chats/${group.key}/logs?limit=100`)
+  const logs=await request(server,`${base}/chats/${group.key}/history?limit=100`)
   assert.match(JSON.stringify(logs),/OLD_USER_MARKER/)
   const otherNext=await request(server,`${base}/groups/${other.key}/messages`,{content:'OTHER_CONTINUE'})
   await history(server,p,otherNext.id)

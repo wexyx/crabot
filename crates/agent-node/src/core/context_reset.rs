@@ -21,17 +21,11 @@ impl Core {
         }) {
             return Err("group is busy; interrupt it or wait before /new".into());
         }
-        self.state()
-            .store
-            .logs()
-            .append(
-                project,
-                format!("group:{group}"),
-                vec![
-                    json!({"type":"context.reset","content":"已开启新上下文，历史日志仍然保留。"}),
-                ],
-            )
-            .await?;
+        crate::storage::knowledge::persist(
+            project,
+            &format!("group:{group}"),
+            &[json!({"type":"context.reset","content":"已开启新上下文，历史日志仍然保留。"})],
+        )?;
         agent_runtime::workspace::revoke_conversation_approval(&format!("{project}:{group}"));
         Ok(json!({"message":"已开启新上下文，保留项目成员、策略和历史日志。"}))
     }

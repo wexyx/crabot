@@ -23,7 +23,7 @@ impl Profile {
         }
         if self.network != "host" {
             return Err(
-                "network must be host; Carbot no longer isolates process networking".into(),
+                "network must be host; Crabot no longer isolates process networking".into(),
             );
         }
         if !(1..=120).contains(&self.timeout_seconds) {

@@ -41,7 +41,7 @@ impl LaunchCommand {
             let flag = arg.split('=').next().unwrap_or(arg);
             if reserved.contains(&flag) || flag == "--" {
                 return Err(format!(
-                    "启动命令参数 {flag} 由 Carbot 管理，请只填写程序及模型等启动选项"
+                    "启动命令参数 {flag} 由 Crabot 管理，请只填写程序及模型等启动选项"
                 ));
             }
         }

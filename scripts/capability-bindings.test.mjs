@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,modelFixture,act,pause,policy,history} from './admin-fixture.mjs'
 test('shared definitions resolve all four binding layers, inherit, persist and isolate scope',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-bindings-')),work=await mkdtemp(join(tmpdir(),'carbot-binding-work-')),model=await modelFixture();let server
+ const dir=await mkdtemp(join(tmpdir(),'crabot-bindings-')),work=await mkdtemp(join(tmpdir(),'crabot-binding-work-')),model=await modelFixture();let server
  try{
   server=await start(dir,{...model.env,AGENT_WORKDIR:work})
   const p=(await request(server,'/v1/repl')).projects[0].id
@@ -28,20 +28,20 @@ test('shared definitions resolve all four binding layers, inherit, persist and i
   await bind('project_agent',null);assert.equal((await row()).resolution.enabled,false)
   await bind('agent',null);assert.equal((await row()).resolution.enabled,true)
   const testTool=async(project,name,args)=>{const run=await request(server,'/v1/repl/'+project+'/tool-config/business/worker/tests',{name,arguments:args});for(let i=0;i<100;i++){const r=await request(server,'/v1/repl/'+project+'/tool-tests/'+run.id);if(r.status!=='running')return r;await pause(10)}throw Error('timeout')}
-  assert.equal((await testTool(p,'skill_read',{skill_id:'shared-guide'})).output.instructions,'shared instructions')
+  assert.equal((await testTool(p,'find',{target:'skill',id:'shared-guide'})).output.skills[0].instructions,'shared instructions')
   const management=await request(server,'/v1/repl/'+p+'/capabilities/management/skill?agent=admin')
   assert.ok(!management.rows.some(r=>r.resource.definition.id==='shared-guide'))
-  const toolId='builtin:business:tool:list_files'
+  const toolId='builtin:business:tool:find'
   await bind('global',false,p,'tool',toolId)
-  const denied=await fetch(server.url+'/v1/repl/'+p+'/tool-config/business/worker/tests',{method:'POST',headers:{'x-admin-token':server.token,'content-type':'application/json'},body:JSON.stringify({name:'list_files',arguments:{path:'.'}})})
+  const denied=await fetch(server.url+'/v1/repl/'+p+'/tool-config/business/worker/tests',{method:'POST',headers:{'x-admin-token':server.token,'content-type':'application/json'},body:JSON.stringify({name:'find',arguments:{target:'tool'}})})
   assert.equal(denied.status,400)
   await bind('project_agent',true,p,'tool',toolId)
-  assert.equal((await testTool(p,'list_files',{path:'.'})).status,'completed')
+  assert.equal((await testTool(p,'find',{target:'tool'})).status,'completed')
   await put(base(q)+'skill',{id:saved.id,expected_version:1,definition:{...definition,files:{'SKILL.md':'updated everywhere'}}})
   assert.equal((await row()).resource.definition.files['SKILL.md'],'updated everywhere')
   await put(base(p)+'skill',{id:saved.id,expected_version:1,definition},409)
   await put(base(p)+'skill',{expected_version:0,definition:{...definition,id:'unsafe',allow_python:true}},400)
-  await put(base(p)+'tool',{expected_version:0,definition:{name:'list_files',description:'bad',command:'echo bad',enabled:true}},400)
+  await put(base(p)+'tool',{expected_version:0,definition:{name:'find',description:'bad',command:'echo bad',enabled:true}},400)
   const command=await put(base(p)+'tool',{expected_version:0,definition:{name:'shared_echo',description:'Shared command',command:'printf shared',enabled:false}})
   assert.equal((await row(q,'tool',command.id)).resource.definition.command,'printf shared')
   // A project in the Web is a collaboration group, not the legacy storage namespace.
@@ -62,9 +62,9 @@ test('shared definitions resolve all four binding layers, inherit, persist and i
   assert.ok(workerRun,'local worker ran')
   assert.ok(!workerRun.skills.some(s=>s.id==='shared-guide'),'execution respects project Skill binding')
   await put(base(p)+'tool/bindings?agent=worker&group='+a.key,{id:toolId,layer:'project_agent',enabled:false,expected_version:0})
-  const deniedGroup=await fetch(server.url+'/v1/repl/'+p+'/tool-config/business/worker/tests',{method:'POST',headers:{'x-admin-token':server.token,'content-type':'application/json'},body:JSON.stringify({name:'list_files',arguments:{path:'.'},group:a.key})})
+  const deniedGroup=await fetch(server.url+'/v1/repl/'+p+'/tool-config/business/worker/tests',{method:'POST',headers:{'x-admin-token':server.token,'content-type':'application/json'},body:JSON.stringify({name:'find',arguments:{target:'tool'},group:a.key})})
   assert.equal(deniedGroup.status,400)
-  const allowedGroup=await request(server,'/v1/repl/'+p+'/tool-config/business/worker/tests',{name:'list_files',arguments:{path:'.'},group:b.key})
+  const allowedGroup=await request(server,'/v1/repl/'+p+'/tool-config/business/worker/tests',{name:'find',arguments:{target:'tool'},group:b.key})
   assert.ok(allowedGroup.id)
   await stop(server);server=await start(dir,{...model.env,AGENT_WORKDIR:work})
   assert.equal((await row()).resolution.enabled,true)

@@ -1,4 +1,4 @@
-/* Element Plus owns controls; Carbot owns only page and conversation layout. */
+/* Element Plus owns controls; Crabot owns only page and conversation layout. */
 :root{--el-color-primary:#4c79e8;--el-border-radius-base:8px;--el-font-size-base:14px}
 :root[data-theme="light"]{--bg:#f5f7fa;--panel:#fff;--raised:#f0f2f5;--line:#e4e7ed;--ink:#303133;--muted:#909399;--accent:var(--el-color-primary)}
 :root[data-theme="dark"]{--bg:#141414;--panel:#1d1e1f;--raised:#262727;--line:#363637;--ink:#e5eaf3;--muted:#a3a6ad;--accent:#8aabff}
@@ -20,10 +20,10 @@ html,body{background:var(--bg);color:var(--ink)}
 .el-input__wrapper,.el-select__wrapper{background:var(--el-fill-color-blank);border-radius:8px;min-height:36px}
 .el-input,.el-select{min-width:0;width:100%}
 .el-checkbox__original,.el-radio__original{padding:0;border:0}
-.el-dialog.carbot-dialog{padding:0;width:min(1120px,94vw);border-radius:12px;overflow:hidden;background:var(--panel)}
-.carbot-dialog .el-dialog__header{display:none}.carbot-dialog .el-dialog__body{padding:0;color:var(--ink)}
+.el-dialog.crabot-dialog{padding:0;width:min(1120px,94vw);border-radius:12px;overflow:hidden;background:var(--panel)}
+.crabot-dialog .el-dialog__header{display:none}.crabot-dialog .el-dialog__body{padding:0;color:var(--ink)}
 .config-panel,.config-panel.inline-panel{background:var(--panel);color:var(--ink);box-shadow:none}
-.carbot-dialog .config-panel{width:100%;height:min(820px,86dvh);max-height:none;border:0;border-radius:0}
+.crabot-dialog .config-panel{width:100%;height:min(820px,86dvh);max-height:none;border:0;border-radius:0}
 .config-panel .config-header{background:var(--panel);border-bottom:1px solid var(--line);padding:22px 26px}
 .config-header h2{font-size:20px;color:var(--ink)}.config-header .eyebrow{display:none}
 .config-panel .config-detail{background:var(--panel)}
@@ -72,7 +72,7 @@ html,body{background:var(--bg);color:var(--ink)}
 .empty-project .el-empty__description p{color:var(--muted)}
 .settings-panel{background:var(--panel);color:var(--ink);box-shadow:none;border-radius:12px}
 .el-overlay{backdrop-filter:blur(2px)}
-@media(max-width:750px){.workspace{grid-template-columns:1fr}.messages{padding:16px}.composer-area{padding:12px}.carbot-dialog .config-panel{height:90dvh}.el-dialog.carbot-dialog{width:96vw}.message-content{max-width:88%}}
+@media(max-width:750px){.workspace{grid-template-columns:1fr}.messages{padding:16px}.composer-area{padding:12px}.crabot-dialog .config-panel{height:90dvh}.el-dialog.crabot-dialog{width:96vw}.message-content{max-width:88%}}
 
 /* Shared chrome and native layout, with no legacy palette overriding component internals. */
 .sidebar-spacer{flex:1;min-height:20px}.brand-name{flex:1;font-weight:650}

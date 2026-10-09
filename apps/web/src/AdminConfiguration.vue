@@ -10,7 +10,7 @@ const values=ref({}),loaded=ref(false),key=ref(''),hasKey=ref(false),clearKey=re
 async function load(){
   try {
     error.value='';const data=await props.request('/v1/admin-agent/configuration')
-    values.value={ADMIN_AGENT_PROVIDER:'carbot',MODEL_PROVIDER:'openai',MODEL_API:'',MODEL_BASE_URL:'',MODEL_NAME:'',CODEX_BIN:'',CLAUDE_BIN:'',OPENCODE_BIN:'',OPENCODE_MODEL:'',OPENCODE_AGENT:'',OPENCODE_AUTO_APPROVE:'',OPENCODE_THINKING:'',OPENCODE_STANDALONE:'',...data.configuration.values}
+    values.value={ADMIN_AGENT_PROVIDER:'crabot',MODEL_PROVIDER:'openai',MODEL_API:'',MODEL_BASE_URL:'',MODEL_NAME:'',MODEL_SYSTEM_PROMPT:'',CODEX_BIN:'',CLAUDE_BIN:'',OPENCODE_BIN:'',OPENCODE_MODEL:'',OPENCODE_AGENT:'',OPENCODE_AUTO_APPROVE:'',OPENCODE_THINKING:'',OPENCODE_STANDALONE:'',...data.configuration.values}
     hasKey.value=data.configuration.has_api_key;key.value='';clearKey.value=false;loaded.value=true
   }catch(e){error.value=e.message}
 }
@@ -32,7 +32,7 @@ onMounted(()=>{if(props.expanded)load()})
     <el-form v-if="loaded" @submit.prevent="save" label-position="top">
       <RuntimeConfigurationFields v-model:provider="values.ADMIN_AGENT_PROVIDER" :values="values" v-model:secret="key" v-model:clear-secret="clearKey" :has-key="hasKey" :request="props.request"/>
       <small class="configuration-note">无运行中任务时可切换；会话历史保留。密钥本地明文保存（0600）；CLI 须预先安装并配置认证。配置会持久保存；显式环境变量优先于已保存配置，启动配置文件仅提供默认值。</small>
-      <div class="configuration-actions"><span>配置仅存储在当前 Carbot</span><el-button type="primary" native-type="submit" :disabled="busy">{{busy?'保存中…':'保存并切换'}}</el-button></div>
+      <div class="configuration-actions"><span>配置仅存储在当前 Crabot</span><el-button type="primary" native-type="submit" :disabled="busy">{{busy?'保存中…':'保存并切换'}}</el-button></div>
     </el-form>
     <p v-if="error" role="alert">{{error}}</p>
   </el-collapse-item></el-collapse>

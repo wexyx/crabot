@@ -22,12 +22,7 @@ pub(super) async fn append_batch(
             .ok_or("session missing project")?,
     )
     .map_err(|e| e.to_string())?;
-    let events = core
-        .state()
-        .store
-        .logs()
-        .append(project, "admin".into(), batch)
-        .await?;
+    let events = crate::storage::knowledge::persist(project, "admin", &batch)?;
     // Chat events are committed first. Metadata is only a small materialized index.
     if let Some(status) = status {
         let mut row = row;

@@ -86,6 +86,7 @@ pub(crate) async fn send(
     );
     let group = super::project_execution::ProjectExecution::current();
     command.data["capability_project"] = json!(group);
+    command.data["history_before"] = json!(super::project_execution::ProjectExecution::run());
     command.data["workspace"] = super::project_execution::ProjectExecution::workspace();
     let catalog = skills::for_group(&state, project_id, &client_id, group.as_deref())
         .await
@@ -114,7 +115,7 @@ pub(crate) async fn send(
         .await
         .iter()
         .any(|r| r["project_id"] == json!(project_id) && r["client_id"] == client_id);
-    let history = conversation::context(&state, project_id, id, None)
+    let history = conversation::context(&state, project_id, id, None, &client_id)
         .await
         .map_err(|error| (ErrorKind::Conflict, Detail(json!({"error":error}))))?;
     if !is_local {

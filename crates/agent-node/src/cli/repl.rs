@@ -29,7 +29,7 @@ pub(crate) async fn run(manager: Arc<Manager>) -> Result<(), String> {
         let Some(line) = line else {
             break;
         };
-        if line.trim().is_empty() {
+        if line.trim().is_empty() && !controller.choosing_chat() {
             continue;
         }
         match controller.execute(&line).await {

@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {modelFixture,start,stop,request,act,policy,history,pause} from './admin-fixture.mjs'
 test('AdminAgent tools persist groups, conversations and enrollment across restart',{timeout:30000},async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-admin-files-')),model=await modelFixture();let server
+  const dir=await mkdtemp(join(tmpdir(),'crabot-admin-files-')),model=await modelFixture();let server
   try{
     server=await start(dir,model.env)
     const token=server.token,profile=await request(server,'/v1/agent')
@@ -33,7 +33,7 @@ test('AdminAgent tools persist groups, conversations and enrollment across resta
     const connection=await fetch(server.url+'/v1/client/connect',{headers:{'x-agent-ak':keys.ak,'x-agent-sk':keys.sk}})
     assert.equal(connection.status,200);await connection.body.cancel()
     assert.equal((await fetch(server.url+'/v1/client/connect',{headers:{'x-agent-ak':keys.ak,'x-agent-sk':'wrong'}})).status,401)
-    assert.equal((await fetch(server.url+'/v1/carbot/control',{method:'POST'})).status,404)
+    assert.equal((await fetch(server.url+'/v1/crabot/control',{method:'POST'})).status,404)
     await stop(server)
     const snapshot=await readState(dir)
     assert.equal(snapshot.collections.history,undefined)
@@ -43,7 +43,7 @@ test('AdminAgent tools persist groups, conversations and enrollment across resta
   }finally{await stop(server);await model.close();await rm(dir,{recursive:true,force:true})}
 })
 test('interrupted business CLI context survives restart through group conversation',{timeout:30000},async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-admin-resume-')),model=await modelFixture();let server
+  const dir=await mkdtemp(join(tmpdir(),'crabot-admin-resume-')),model=await modelFixture();let server
   const cli=join(dir,'fake-codex')
   await writeFile(cli,`#!${process.execPath}
 const prompt=process.argv.at(-1);
@@ -67,8 +67,9 @@ else {if(!prompt.includes('ORIGINAL_REQUEST')||!prompt.includes('checkpoint: ins
     await stop(server)
     const snapshot=await readState(join(dir,'data'))
     assert.equal(snapshot.collections.runs[next.id].prompt,'REVISED_REQUEST')
-    const chatDir=join(dir,'data/chats',project,Buffer.from('group:'+group.key).toString('hex'))
-    const log=(await Promise.all((await readdir(chatDir)).filter(f=>f.endsWith('.jsonl')).map(f=>readFile(join(chatDir,f),'utf8')))).join('')
+    server=await start(join(dir,'data'),env)
+    const log=JSON.stringify(await request(server,`/v1/repl/${project}/chats/${group.key}/history`))
     for(const term of ['ORIGINAL_REQUEST','checkpoint: inspected existing files','REVISED_REQUEST'])assert.ok(log.includes(term))
+
   }finally{await stop(server);await model.close();await rm(dir,{recursive:true,force:true})}
 })

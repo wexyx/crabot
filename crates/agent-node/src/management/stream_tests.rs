@@ -1,11 +1,11 @@
 use super::{journal::Journal, session};
-use crate::{carbot_tests, core::Core};
+use crate::{core::Core, crabot_tests};
 use serde_json::json;
 use uuid::Uuid;
 
 #[tokio::test]
 async fn append_log_before_final_metadata_and_reject_sequence_conflicts() {
-    let core = Core::new(carbot_tests::state("stream-batch").await);
+    let core = Core::new(crabot_tests::state("stream-batch").await);
     let id = Uuid::new_v4();
     core.state()
         .store
@@ -35,15 +35,10 @@ async fn append_log_before_final_metadata_and_reject_sequence_conflicts() {
         .unwrap();
     assert_eq!(before["status"], "completed");
     assert!(before.get("events").is_none());
-    assert_eq!(
-        core.state()
-            .store
-            .logs()
-            .read(id, "admin".into(), 0, u64::MAX, 20)
-            .await
-            .unwrap(),
-        events
-    );
+    // The index is the only store, including streaming and terminal markers.
+    let history = crate::core::indexed_history::IndexedHistory::new(id, "admin".into(), None);
+    let (rows, _) = history.rows(None, 0, u64::MAX, 20).await.unwrap();
+    assert_eq!(rows, events);
     assert!(
         session::append_batch(
             &core,

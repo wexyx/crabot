@@ -38,7 +38,7 @@ async fn durable_context_is_scoped_ordered_and_keeps_interrupted_progress() {
             .await
         );
     }
-    let text = conversation::context(&s, p, topic, Some(second))
+    let text = conversation::context(&s, p, topic, Some(second), "local")
         .await
         .unwrap();
     assert!(text.contains("original requirement"));
@@ -129,8 +129,8 @@ async fn old_management_api_is_retired_and_chat_transport_requires_admin() {
     let server = tokio::spawn(async move { axum::serve(listener, router(state)).await.unwrap() });
     let client = reqwest::Client::new();
     for path in [
-        "/v1/carbot/control",
-        "/v1/carbot/runs",
+        "/v1/crabot/control",
+        "/v1/crabot/runs",
         "/v1/spaces",
         "/v1/management/start",
     ] {
@@ -250,9 +250,12 @@ async fn nested_subgroups_freeze_recursively_and_keep_context_between_rounds() {
             .contains("worker completed")
     );
     let logs = logs.lock().await;
-    assert_eq!(logs.len(), 2);
+    assert_eq!(
+        logs.len(),
+        1,
+        "a single-member discussion needs no repeated rounds"
+    );
     assert!(!logs.iter().any(|s| s.contains("new-only")));
-    assert!(logs[1].contains("worker completed"));
 }
 
 pub(crate) async fn state(id: &str) -> AppState {
@@ -305,7 +308,7 @@ async fn mount(parent: &AppState, p: Uuid, name: &str, child: &AppState, q: Uuid
         (p, name.into()),
         ClientConnection {
             sender: tx,
-            role: "Carbot".into(),
+            role: "Crabot".into(),
             node_id: Some(child.node_id.clone()),
         },
     );
@@ -335,7 +338,7 @@ async fn mount(parent: &AppState, p: Uuid, name: &str, child: &AppState, q: Uuid
                     &Credential {
                         project_id: p,
                         client_id: name,
-                        role: "Carbot".into(),
+                        role: "Crabot".into(),
                     },
                     reply,
                 )
@@ -345,6 +348,19 @@ async fn mount(parent: &AppState, p: Uuid, name: &str, child: &AppState, q: Uuid
     });
 }
 async fn executor(s: &AppState, p: Uuid, id: &str, logs: Arc<Mutex<Vec<String>>>) {
+    scripted_executor(s, p, id, logs, vec![]).await;
+}
+async fn scripted_executor(
+    s: &AppState,
+    p: Uuid,
+    id: &str,
+    logs: Arc<Mutex<Vec<String>>>,
+    replies: Vec<&str>,
+) {
+    let mut replies = replies
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<std::collections::VecDeque<_>>();
     let (tx, mut rx) = mpsc::channel::<WireEvent>(32);
     s.clients.lock().await.insert(
         (p, id.into()),
@@ -359,7 +375,9 @@ async fn executor(s: &AppState, p: Uuid, id: &str, logs: Arc<Mutex<Vec<String>>>
         while let Some(command) = rx.recv().await {
             let prompt = command.data["content"].as_str().unwrap();
             logs.lock().await.push(format!("{id}:{prompt}"));
-            let (kind, answer) = if id == "limited" {
+            let (kind, answer) = if let Some(answer) = replies.pop_front() {
+                ("agent.message", answer)
+            } else if id == "limited" {
                 ("agent.error", "TOKEN_INSUFFICIENT: fixture".into())
             } else if prompt.contains("RELAY NEGOTIATION ONLY") {
                 (
@@ -671,7 +689,7 @@ async fn relay_a2a_and_pmo_execute_real_member_dispatch() {
     assert_eq!(answer, "worker completed");
     policy.members[0] = Member {
         path: vec!["leader".into()],
-        role: "PMO".into(),
+        role: "Leader".into(),
     };
     policy.mode = Mode::A2a;
     policy.rounds = 2;
@@ -730,13 +748,193 @@ async fn a2a_round_two_flags_each_speaker_own_messages() {
     // Dispatch order: round1 leader, round1 worker, round2 leader, round2 worker.
     assert_eq!(logs.len(), 4);
     let round2_leader = &logs[2];
-    assert!(round2_leader.contains("你（leader"));
+    assert!(round2_leader.contains("You (leader"));
     assert!(round2_leader.contains("worker: worker completed"));
     // The leader's own round-1 statement is not presented as another participant's line.
     assert!(!round2_leader.contains("\nleader: leader completed"));
     let round2_worker = &logs[3];
-    assert!(round2_worker.contains("你（worker"));
+    assert!(round2_worker.contains("You (worker"));
     assert!(round2_worker.contains("leader: leader completed"));
+}
+
+#[tokio::test]
+async fn discussion_stops_on_consensus_rechecks_new_opinions_and_yields_by_role() {
+    for (replies, expected, unclaimed) in [
+        (
+            vec![
+                vec!["方案一"],
+                vec!["同意当前结论，无补充。"],
+                vec!["同意当前结论，无补充。"],
+            ],
+            3,
+            false,
+        ),
+        (
+            vec![
+                vec!["方案一", "同意当前结论，无补充。"],
+                vec!["同意当前结论，无补充。", "同意当前结论，无补充。"],
+                vec!["改为方案二"],
+            ],
+            5,
+            false,
+        ),
+        (
+            vec![
+                vec![
+                    "本轮让出。",
+                    "本轮让出。原因：这是其他成员的职责，我没有待处理事项。",
+                    "本轮让出。",
+                    "本轮让出。原因：新意见仍不属于我的职责，未被指派。",
+                ],
+                vec!["方案一"],
+                vec!["同意当前结论，无补充。"],
+            ],
+            6,
+            false,
+        ),
+        (
+            vec![
+                vec!["本轮让出。", "本轮让出。原因：任务与职责无关，也未被指派。"],
+                vec!["本轮让出。", "本轮让出。原因：任务与职责无关，也未被指派。"],
+                vec!["本轮让出。", "本轮让出。原因：任务与职责无关，也未被指派。"],
+            ],
+            6,
+            true,
+        ),
+    ] {
+        let s = state("discussion").await;
+        let p = Uuid::new_v4();
+        let logs = Arc::new(Mutex::new(vec![]));
+        let mut policy = relay("a");
+        policy.mode = Mode::A2a;
+        policy.rounds = 60;
+        policy.members = ["a", "b", "c"]
+            .into_iter()
+            .map(|id| Member {
+                path: vec![id.into()],
+                role: format!("{id} 的职责"),
+            })
+            .collect();
+        for (member, replies) in policy.members.iter().zip(replies) {
+            scripted_executor(&s, p, &member.path[0], logs.clone(), replies).await;
+        }
+        let (tx, _) = mpsc::channel(128);
+        let result = policies::engine(&s, p, &policy, "任务", &policies::Dispatch::new(&tx, &[]))
+            .await
+            .unwrap();
+        let logs = logs.lock().await;
+        assert_eq!(
+            logs.len(),
+            expected,
+            "must stop without dispatching another member"
+        );
+        assert_eq!(result.contains("没有成员认领"), unclaimed);
+        assert!(logs.iter().all(
+            |prompt| prompt.contains("first check the user's latest request")
+                && prompt.contains("do not call tools")
+        ));
+    }
+}
+
+#[tokio::test]
+async fn discussion_rechecks_yields_and_rejects_addressed_abstentions_without_looping() {
+    for (addressed, replies, expected_error) in [
+        (false, vec!["本轮让出。", "已根据你的追问完成检查。"], None),
+        (
+            false,
+            vec!["本轮让出。", "本轮让出。"],
+            Some("未提供有效理由"),
+        ),
+        (
+            true,
+            vec!["本轮让出。", "本轮让出。原因：我的默认角色不负责这件事。"],
+            Some("用户已明确指派"),
+        ),
+        (
+            true,
+            vec!["本轮让出。", "无法访问该文件，请提供可读路径。"],
+            None,
+        ),
+    ] {
+        let s = state("participation").await;
+        let p = Uuid::new_v4();
+        let logs = Arc::new(Mutex::new(vec![]));
+        scripted_executor(&s, p, "a", logs.clone(), replies).await;
+        scripted_executor(&s, p, "b", logs.clone(), vec!["同意当前结论，无补充。"]).await;
+        let mut policy = relay("a");
+        policy.mode = Mode::A2a;
+        policy.rounds = 60;
+        policy.members.push(Member {
+            path: vec!["b".into()],
+            role: "review".into(),
+        });
+        let (tx, _) = mpsc::channel(128);
+        let paths = if addressed {
+            vec![vec!["a".into()], vec!["b".into()]]
+        } else {
+            vec![]
+        };
+        let dispatch = policies::Dispatch {
+            addressed: &paths,
+            ..policies::Dispatch::new(&tx, &[])
+        };
+        let result =
+            policies::engine(&s, p, &policy, "我已经明确要求你检查，请继续。", &dispatch).await;
+        let logs = logs.lock().await;
+        if let Some(error) = expected_error {
+            assert!(result.unwrap_err().contains(error));
+            assert_eq!(
+                logs.len(),
+                2,
+                "stop after one recheck, never skip to the next member"
+            );
+        } else {
+            assert!(result.is_ok(), "{result:?}");
+            assert_eq!(logs.len(), 3);
+        }
+        assert!(
+            logs[0].contains("take precedence over default roles")
+                || logs[0].contains("must not override the user's assignment")
+        );
+        assert!(logs[1].contains("Responsibility recheck"));
+        assert!(logs[1].contains("Do not repeat operations already performed"));
+    }
+}
+
+#[tokio::test]
+async fn single_addressed_member_cannot_escape_by_switching_to_chat_mode() {
+    let s = state("direct-participation").await;
+    let p = Uuid::new_v4();
+    let logs = Arc::new(Mutex::new(vec![]));
+    scripted_executor(
+        &s,
+        p,
+        "a",
+        logs.clone(),
+        vec!["本轮让出。", "本轮让出。原因：应该其他人先处理。"],
+    )
+    .await;
+    let mut policy = relay("a");
+    policy.mode = Mode::A2a;
+    policy.members.push(Member {
+        path: vec!["b".into()],
+        role: "review".into(),
+    });
+    let paths = vec![vec!["a".into()]];
+    let policy = crate::core::mentions::narrow(&policy, &paths)
+        .unwrap()
+        .unwrap();
+    assert_eq!(policy.mode, Mode::Chat);
+    let (tx, _) = mpsc::channel(128);
+    let dispatch = policies::Dispatch {
+        addressed: &paths,
+        ..policies::Dispatch::new(&tx, &[])
+    };
+    let error = policies::engine(&s, p, &policy, "请你处理", &dispatch)
+        .await
+        .unwrap_err();
+    assert!(error.contains("用户已明确指派"));
+    assert_eq!(logs.lock().await.len(), 2);
 }
 
 #[tokio::test]
@@ -802,10 +1000,10 @@ async fn pmo_leader_is_shown_its_own_assignments_before_summarizing() {
     let logs = logs.lock().await;
     assert_eq!(logs.len(), 3);
     // The worker is told who assigned it.
-    assert!(logs[1].contains("PMO assignment from leader"));
+    assert!(logs[1].contains("Leader assignment from leader"));
     // The leader is shown its own instruction as its own, not as fresh input.
     let summarize = &logs[2];
-    assert!(summarize.contains("你（leader，你自己下发的指令）"));
+    assert!(summarize.contains("You (leader, your own assignment)"));
     assert!(summarize.contains("worker: do research"));
     assert!(summarize.contains("worker: worker completed"));
 }
@@ -1231,7 +1429,7 @@ async fn a_pmo_that_keeps_refusing_fails_after_exactly_one_retry() {
         .await
         .unwrap_err();
     assert!(
-        error.contains("PMO must return JSON assignments"),
+        error.contains("Leader must return JSON assignments"),
         "{error}"
     );
     let logs = logs.lock().await;

@@ -2,7 +2,7 @@
 import {computed,ref,inject} from 'vue'
 import MarkdownText from './MarkdownText.vue'
 import {splitAttachments,attachmentUrl} from './attachments.js'
-const address=inject('carbotAddress',ref(''))
+const address=inject('crabotAddress',ref(''))
 const url=file=>attachmentUrl(file.url,address.value)
 const props=defineProps({text:String})
 const body=computed(()=>splitAttachments(props.text||'')),failed=ref(new Set())

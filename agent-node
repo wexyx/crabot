@@ -5,10 +5,10 @@ source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 cd "$source_dir"
 
 usage() {
-  printf '%s\n' 'agent-node [start|run|proxy] [--cli] [--name ALIAS] [--server-port PORT] [--workdir PATH] [--outside-access ask|deny]' 'carbot [--workdir PATH] [--outside-access ask|deny]' '管理操作请直接与默认 Agent 对话。启动配置使用环境变量或 .agent.env。'
+  printf '%s\n' 'agent-node [start|run|proxy] [--cli] [--name ALIAS] [--server-port PORT] [--workdir PATH] [--outside-access ask|deny]' 'crabot [--workdir PATH] [--outside-access ask|deny]' '管理操作请直接与默认 Agent 对话。启动配置使用环境变量或 .agent.env。'
 }
 # Rust loads instance and invocation-directory .agent.env consistently with releases.
-export CARBOT_LAUNCH_DIR="$invocation_dir"
+export CRABOT_LAUNCH_DIR="$invocation_dir"
 command_name=start
 if [[ $# -gt 0 && $1 != --* ]]; then command_name=$1; shift; fi
 case "$command_name" in
@@ -43,10 +43,10 @@ while [[ $# -gt 0 ]]; do
 done
 # Let Rust resolve home-based defaults; only normalize explicitly configured paths.
 if [[ -n ${AGENT_WORKDIR:-} && $AGENT_WORKDIR != /* ]]; then export AGENT_WORKDIR="$invocation_dir/$AGENT_WORKDIR"; fi
-if [[ -n ${CARBOT_DATA_DIR:-} && $CARBOT_DATA_DIR != /* ]]; then export CARBOT_DATA_DIR="$invocation_dir/$CARBOT_DATA_DIR"; fi
-export CARBOT_BUNDLED_SYSTEM_SKILLS_DIR="$source_dir/skills/system"
-export CARBOT_BUNDLED_WEB_DIR="$source_dir/apps/web/dist"
-if [[ $interactive == false && ! -f ${WEB_CONFIG_DIR:-$CARBOT_BUNDLED_WEB_DIR}/index.html ]]; then
+if [[ -n ${CRABOT_DATA_DIR:-} && $CRABOT_DATA_DIR != /* ]]; then export CRABOT_DATA_DIR="$invocation_dir/$CRABOT_DATA_DIR"; fi
+export CRABOT_BUNDLED_SYSTEM_SKILLS_DIR="$source_dir/skills/system"
+export CRABOT_BUNDLED_WEB_DIR="$source_dir/apps/web/dist"
+if [[ $interactive == false && ! -f ${WEB_CONFIG_DIR:-$CRABOT_BUNDLED_WEB_DIR}/index.html ]]; then
   command -v pnpm >/dev/null || { printf '请先 pnpm install && pnpm web:build，或指定 WEB_CONFIG_DIR。\n' >&2; exit 1; }
   pnpm web:build
 fi

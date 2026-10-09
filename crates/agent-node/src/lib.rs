@@ -29,4 +29,4 @@ pub(crate) use session_handlers::*;
 pub(crate) use state::*;
 pub(crate) use storage::policies as policy_store;
 #[cfg(test)]
-pub(crate) use tests::groups as carbot_tests;
+pub(crate) use tests::groups as crabot_tests;

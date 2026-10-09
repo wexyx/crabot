@@ -3,12 +3,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {spawn} from 'node:child_process'
 import {once} from 'node:events'
-import {mkdtemp,readFile,readdir,rm} from 'node:fs/promises'
+import {mkdtemp,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join,resolve} from 'node:path'
 import {modelFixture,pause} from './admin-fixture.mjs'
 test('CLI aliases isolate data, reject duplicate process, and allocate separate Web ports',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-instances-')),model=await modelFixture(),children=[]
+ const dir=await mkdtemp(join(tmpdir(),'crabot-instances-')),model=await modelFixture(),children=[]
  function launch(name,extra={}){
    const child=spawn(resolve('target/debug/agent-node'),['--cli','--workdir',dir,'--name',name,'--web-port','0'],{cwd:dir,env:{HOME:dir,PATH:process.env.PATH,...model.env,...extra},stdio:['pipe','pipe','pipe']})
    const item={child,output:'',name};children.push(item)
@@ -16,13 +16,15 @@ test('CLI aliases isolate data, reject duplicate process, and allocate separate 
  }
  async function wait(item,text){for(let i=0;i<200;i++){if(item.output.includes(text))return;if(item.child.exitCode!==null)throw Error(item.output);await pause(20)}throw Error(item.output)}
  async function logs(name){
-   const root=join(dir,'.carbot_'+name),state=await readState(root),p=Object.keys(state.collections.projects)[0]
-   const folder=join(root,'chats',p,Buffer.from('admin').toString('hex'))
-   return (await Promise.all((await readdir(folder)).map(f=>readFile(join(folder,f),'utf8')))).join('').trim().split('\n').map(s=>JSON.parse(s))
+   const root=join(dir,'.crabot_'+name),state=await readState(root),p=Object.keys(state.collections.projects)[0]
+   const address=state.collections.instance_settings.web.address
+   const response=await fetch(`http://${address}/v1/repl/${p}/chats/admin/history`)
+   assert.equal(response.status,200)
+   return (await response.json()).events
  }
  async function web(item,input){
    item.output='';item.child.stdin.write('启动网页 TEST_PLAN:'+JSON.stringify([{name:'server_start',input}])+'\n')
-   await wait(item,'[完成]')
+   await wait(item,'Fixture complete\nadmin> ')
    return JSON.parse((await logs(item.name)).filter(e=>e.type==='tool_finished').at(-1).output)
  }
  try{

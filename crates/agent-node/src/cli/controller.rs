@@ -24,6 +24,7 @@ pub(super) struct Controller {
     previous: Option<Uuid>,
     navigation: Vec<(Uuid, Uuid, Option<String>, Option<Uuid>)>,
     attachments: Vec<agent_runtime::attachments::Attachment>,
+    chat_picker: Option<super::project_selection::ProjectPicker>,
 }
 impl Controller {
     pub(super) async fn new(manager: Arc<Manager>) -> Result<Self, String> {
@@ -39,6 +40,7 @@ impl Controller {
             previous: None,
             navigation: Vec::new(),
             attachments: Vec::new(),
+            chat_picker: None,
         })
     }
     pub(super) fn group(&self) -> Option<String> {
@@ -91,7 +93,7 @@ impl Controller {
     pub(super) fn heading(&self) -> String {
         format!(
             "{} · {} · 项目 {} · 会话 {}",
-            std::env::var("CARBOT_INSTANCE").unwrap_or_else(|_| "default".into()),
+            std::env::var("CRABOT_INSTANCE").unwrap_or_else(|_| "default".into()),
             self.label(),
             self.group.as_deref().unwrap_or("管理"),
             &self.view().1.to_string()[..8]
@@ -108,8 +110,50 @@ impl Controller {
     pub(super) fn can_back(&self) -> bool {
         !self.navigation.is_empty()
     }
+    pub(super) fn choosing_chat(&self) -> bool {
+        self.chat_picker.is_some()
+    }
+    pub(super) fn chat_menu(&self) -> Option<String> {
+        self.chat_picker.as_ref().map(|picker| picker.menu())
+    }
+    pub(super) fn move_chat_choice(&mut self, forward: bool) -> bool {
+        if let Some(picker) = self.chat_picker.as_mut() {
+            picker.move_by(forward);
+            true
+        } else {
+            false
+        }
+    }
+    pub(super) fn cancel_chat_choice(&mut self) -> bool {
+        self.chat_picker.take().is_some()
+    }
     pub(super) async fn execute(&mut self, line: &str) -> Result<Action, String> {
-        if line.trim() == "/back" {
+        if line.trim() == "/cancel" && self.cancel_chat_choice() {
+            return Ok(Action {
+                text: "已取消选择聊天。".into(),
+                ..Default::default()
+            });
+        }
+        let selected = if let Some(picker) = self
+            .chat_picker
+            .as_ref()
+            .filter(|_| !line.trim_start().starts_with('/'))
+        {
+            let id = match picker.choose(line)? {
+                Some(id) => id,
+                None => {
+                    let project = self.manager.core().bootstrap().await?;
+                    super::default_project::create(&self.manager, project).await?
+                }
+            };
+            Some(format!("/chat {id}"))
+        } else {
+            None
+        };
+        let line = selected.as_deref().unwrap_or(line);
+        let opening_picker =
+            matches!(commands::parse(line)?,Command::Workbench(op,_) if op=="projects.list");
+        if matches!(commands::parse(line)?, Command::Back) {
             let (project, session, group, previous) = self
                 .navigation
                 .pop()
@@ -119,6 +163,7 @@ impl Controller {
             self.group = group;
             self.previous = previous;
             self.attachments.clear();
+            self.chat_picker = None;
             return Ok(Action {
                 navigate: true,
                 replay: true,
@@ -133,6 +178,9 @@ impl Controller {
             self.previous,
         );
         let action = self.execute_inner(line).await?;
+        if !opening_picker {
+            self.chat_picker = None;
+        }
         if action.navigate
             && (before.0 != self.project || before.1 != self.session || before.2 != self.group)
         {
@@ -196,7 +244,7 @@ impl Controller {
                 let path = if path.is_absolute() {
                     path
                 } else {
-                    std::env::var_os("CARBOT_LAUNCH_DIR")
+                    std::env::var_os("CRABOT_LAUNCH_DIR")
                         .map(std::path::PathBuf::from)
                         .unwrap_or(std::env::current_dir().map_err(|e| e.to_string())?)
                         .join(path)
@@ -220,6 +268,10 @@ impl Controller {
             }
             Command::Allowlist(args) => {
                 action.text = super::allowlist::execute(self.manager.core(), &args).await?;
+                return Ok(action);
+            }
+            Command::Prompts(args) => {
+                action.text = super::prompts::execute(self.manager.core(), &args).await?;
                 return Ok(action);
             }
             Command::Permissions(args) => {
@@ -267,18 +319,19 @@ impl Controller {
                 return Ok(action);
             }
             Command::Workbench(op, input) => {
-                if op == "agents.list" && input["contextual"] == true {
-                    if let Some(group) = &self.group {
-                        let result = self
-                            .manager
-                            .core()
-                            .group_command(self.project, group, "/agents")
-                            .await?;
-                        action.text = result["message"].as_str().unwrap_or("").into();
-                        return Ok(action);
-                    }
-                }
                 let result = self.manager.workbench(self.project, &op, input).await?;
+                if op == "projects.list" {
+                    self.chat_picker = super::project_selection::ProjectPicker::new(
+                        &result,
+                        self.group.as_deref(),
+                    );
+                    action.text = self
+                        .chat_picker
+                        .as_ref()
+                        .map(|picker| picker.numbered())
+                        .unwrap_or_else(|| super::workbench_view::render(&op, &result));
+                    return Ok(action);
+                }
                 if op == "agents.test" {
                     self.group = Some(result["key"].as_str().ok_or("missing test chat")?.into());
                     self.previous = None;
@@ -300,14 +353,9 @@ impl Controller {
                     .as_ref()
                     .map(|g| format!("group:{g}"))
                     .unwrap_or_else(|| "admin".into());
-                let rows = self
-                    .manager
-                    .core()
-                    .state()
-                    .store
-                    .logs()
-                    .read(self.project, chat, 0, u64::MAX, 1000)
-                    .await?;
+                let history =
+                    crate::core::indexed_history::IndexedHistory::new(self.project, chat, None);
+                let (rows, _) = history.rows(None, 0, u64::MAX, 1000).await?;
                 let mut tools = super::tool_timeline::ToolTimeline::default();
                 for row in rows {
                     tools.record(&row);
@@ -316,16 +364,11 @@ impl Controller {
                 return Ok(action);
             }
             Command::History(target) => {
-                if target == "admin" {
+                if matches!(target.as_str(), "admin" | "manage") {
                     self.group = None;
                     self.previous = None;
                 } else if !target.is_empty() {
-                    self.manager
-                        .core()
-                        .control(self.project, "group.get", serde_json::json!({"key":target}))
-                        .await?;
-                    self.group = Some(target);
-                    self.previous = None;
+                    self.enter_chat(&target).await?;
                 }
                 action.navigate = true;
                 action.replay = true;
@@ -341,7 +384,7 @@ impl Controller {
                 return Ok(action);
             }
             Command::Help(topic) => {
-                action.text = super::help::topic(&topic)?.into();
+                action.text = super::help::render(&topic)?;
                 return Ok(action);
             }
             Command::AdminConfig => {
@@ -413,23 +456,8 @@ impl Controller {
                 self.attachments.clear();
                 result
             }
-            Command::Project(None) => {
-                serde_json::json!(self.manager.core().state().store.list("projects").await)
-            }
             command => {
                 match command {
-                    Command::Project(Some(id)) => {
-                        let project = id.parse().map_err(|_| "invalid project UUID")?;
-                        self.manager.core().project(project).await?;
-                        let session = serde_json::from_value(
-                            self.manager.create_session(project).await?["id"].clone(),
-                        )
-                        .map_err(|e| e.to_string())?;
-                        self.project = project;
-                        self.session = session;
-                        self.group = None;
-                        self.previous = None;
-                    }
                     Command::New => {
                         self.attachments.clear();
                         if let Some(group) = &self.group {
@@ -455,29 +483,7 @@ impl Controller {
                         self.previous = None;
                     }
                     Command::Chat(id) => {
-                        let projects = self
-                            .manager
-                            .workbench(self.project, "projects.list", serde_json::json!({}))
-                            .await?;
-                        if let Some(row) = projects
-                            .as_array()
-                            .into_iter()
-                            .flatten()
-                            .find(|r| r["key"] == id)
-                        {
-                            self.project = serde_json::from_value(row["namespace_id"].clone())
-                                .map_err(|e| e.to_string())?;
-                            self.session = serde_json::from_value(
-                                self.manager.create_session(self.project).await?["id"].clone(),
-                            )
-                            .map_err(|e| e.to_string())?;
-                        }
-                        self.manager
-                            .core()
-                            .control(self.project, "group.get", serde_json::json!({"key":id}))
-                            .await?;
-                        self.group = Some(id);
-                        self.previous = None;
+                        self.enter_chat(&id).await?;
                     }
                     Command::Admin => {
                         self.group = None;
@@ -492,5 +498,28 @@ impl Controller {
         };
         action.text = Presentation::command_result(&value);
         Ok(action)
+    }
+
+    async fn enter_chat(&mut self, query: &str) -> Result<(), String> {
+        let projects = self
+            .manager
+            .workbench(self.project, "projects.list", serde_json::json!({}))
+            .await?;
+        let row = super::project_selection::resolve(&projects, query)?;
+        let project =
+            serde_json::from_value(row["namespace_id"].clone()).map_err(|e| e.to_string())?;
+        let group = row["key"].as_str().ok_or("项目缺少 ID")?.to_owned();
+        self.manager
+            .core()
+            .control(project, "group.get", serde_json::json!({"key":group}))
+            .await?;
+        let session =
+            serde_json::from_value(self.manager.create_session(project).await?["id"].clone())
+                .map_err(|e| e.to_string())?;
+        self.project = project;
+        self.session = session;
+        self.group = Some(group);
+        self.previous = None;
+        Ok(())
     }
 }

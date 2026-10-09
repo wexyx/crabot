@@ -99,7 +99,7 @@ pub fn proxy_mode() -> bool {
 pub async fn profile(State(state): State<AppState>) -> Json<Value> {
     let proxy = proxy_mode();
     Json(
-        json!({"id":state.node_id,"name":std::env::var("AGENT_NAME").unwrap_or_else(|_| if proxy {"ProxyAgent".into()} else {"My Carbot".into()}),"mode":if proxy {"proxy"} else {"agent"},"architecture":"carbot-webconfig","storage":"local-json","capabilities":if proxy {vec!["descendant-control","versioned-subgroups","execution-snapshots","sessions","history"]} else {vec!["local-execution","descendant-control","versioned-subgroups","execution-snapshots","sessions","history"]},"runtime_provider":std::env::var("AGENT_PROVIDER").unwrap_or_else(|_| "carbot".into())}),
+        json!({"id":state.node_id,"name":std::env::var("AGENT_NAME").unwrap_or_else(|_| if proxy {"ProxyAgent".into()} else {"My Crabot".into()}),"mode":if proxy {"proxy"} else {"agent"},"architecture":"crabot-webconfig","storage":"local-json","capabilities":if proxy {vec!["descendant-control","versioned-subgroups","execution-snapshots","sessions","history"]} else {vec!["local-execution","descendant-control","versioned-subgroups","execution-snapshots","sessions","history"]},"runtime_provider":std::env::var("AGENT_PROVIDER").unwrap_or_else(|_| "crabot".into())}),
     )
 }
 

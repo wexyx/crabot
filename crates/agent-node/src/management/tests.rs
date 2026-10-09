@@ -1,5 +1,5 @@
 use super::*;
-use crate::{carbot_tests, conversation, core::Core};
+use crate::{conversation, core::Core, crabot_tests};
 use agent_runtime::{
     config::{HarnessConfig, ModelApi, RuntimeConfig},
     skills::{ExecutionPolicy, SkillCatalog},
@@ -12,7 +12,7 @@ use std::sync::{
 };
 use uuid::Uuid;
 async fn fixture() -> (Arc<Manager>, Uuid) {
-    let manager = Manager::new(Core::new(carbot_tests::state("manager").await));
+    let manager = Manager::new(Core::new(crabot_tests::state("manager").await));
     let project = manager.core().bootstrap().await.unwrap();
     (manager, project)
 }
@@ -25,21 +25,28 @@ async fn capability_packages_are_disjoint_and_skills_are_scoped() {
         .iter()
         .map(|d| d.name().to_string())
         .collect::<Vec<_>>();
-    assert!(names.contains(&"group_create".into()) && names.contains(&"skill_read".into()));
-    assert!(names.contains(&"history_read".into()));
-    assert!(!names.contains(&"python_run".into()) && !names.contains(&"read_file".into()));
+    assert!(names.contains(&"group_create".into()) && names.contains(&"find".into()));
+    assert!(names.contains(&"compact".into()));
+    assert!(!names.contains(&"python_run".into()) && !names.contains(&"read".into()));
     let business = ToolFactory::create(
         ToolContext::new(
             None,
             SkillCatalog::default(),
-            ExecutionPolicy::new("offline".into(), false).unwrap(),
+            ExecutionPolicy::new("offline".into()).unwrap(),
         )
         .unwrap(),
     )
     .unwrap();
     for registry in [&manager, &business] {
         for strategy in ["summary", "recent"] {
-            let result=registry.execute("history_read",&json!({"action":"compact","strategy":strategy,"summary":"Keep decisions and outstanding work"}),&mut ToolSession::default()).await.unwrap();
+            let result = registry
+                .execute(
+                    "compact",
+                    &json!({"strategy":strategy}),
+                    &mut ToolSession::default(),
+                )
+                .await
+                .unwrap();
             assert_eq!(result["status"], "scheduled");
         }
     }
@@ -175,7 +182,7 @@ async fn natural_language_harness_calls_registered_tools_and_persists_history() 
             assert!(!body["tools"].as_array().unwrap().iter().any(|t|t["function"]["name"]=="python_run"));
             let n=received.fetch_add(1,Ordering::SeqCst);
             let chunk=match n{
-                0=>call("skill_read",json!({"skill_id":"management-guide"})),
+                0=>call("find",json!({"target":"skill","id":"management-guide"})),
                 1=>call("agent_start",json!({"client_id":"worker","role":"developer","provider":"mock"})),
                 2=>call("group_create",json!({"name":"Dev","policy":{"mode":"relay","members":[{"path":["worker"],"role":"developer"}],"rounds":1,"instructions":"","leader":null}})),
                 _=>json!({"choices":[{"delta":{"content":"Group created"},"finish_reason":"stop"}]}),
@@ -187,9 +194,10 @@ async fn natural_language_harness_calls_registered_tools_and_persists_history() 
     let base = format!("http://{}/v1", listener.local_addr().unwrap());
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
     let (m, p) = fixture().await;
-    m.configure(RuntimeConfig::Carbot(HarnessConfig {
+    m.configure(RuntimeConfig::Crabot(HarnessConfig {
         environment: Default::default(),
         context: Default::default(),
+        system_prompt: agent_runtime::config::default_crabot_system_prompt().into(),
         api: ModelApi::Chat,
         base,
         key: "fixture".into(),

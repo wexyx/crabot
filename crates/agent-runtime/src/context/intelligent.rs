@@ -23,7 +23,13 @@ pub struct SummaryPlan {
     summary_limit: usize,
 }
 impl SummaryPlan {
-    fn new(history: &[Value], max_bytes: usize) -> Result<Self, String> {
+    /// Build the compression plan over a window.
+    ///
+    /// `pub(crate)`: the auto-compaction path reaches it through
+    /// `CompressionStrategy::summary_plan`, while the tool-triggered path
+    /// (`compact`) builds it directly — an explicit compaction request is
+    /// always model-driven, whatever the automatic strategy is.
+    pub(crate) fn new(history: &[Value], max_bytes: usize) -> Result<Self, String> {
         let prompt = history
             .first()
             .and_then(|r| r["content"].as_str())
@@ -33,11 +39,15 @@ impl SummaryPlan {
             .filter_map(|m| prompt.rfind(m))
             .max();
         let (prior, current) = split.map(|i| prompt.split_at(i)).unwrap_or(("", prompt));
-        let end = ["\nPrevious records (", "\nPrevious topic records"]
-            .iter()
-            .filter_map(|m| prior.find(m))
-            .min()
-            .unwrap_or(0);
+        let end = [
+            "\nPrevious records (",
+            "\nPrevious topic records",
+            "\n[Crabot working summary",
+        ]
+        .iter()
+        .filter_map(|m| prior.find(m))
+        .min()
+        .unwrap_or(0);
         let (protected, prior) = prior.split_at(end);
         let available = max_bytes
             .checked_sub(protected.len() + current.len() + 1536)
@@ -139,6 +149,18 @@ impl SummaryPlan {
             return Err("智能压缩摘要过长，原始上下文未修改".into());
         }
         Ok(text)
+    }
+    /// Durable summaries must also retain the original rows kept outside the
+    /// model-generated digest; otherwise the stored coverage would hide them.
+    pub fn archive(&self, summary: &str) -> String {
+        if self.recent.is_empty() {
+            summary.to_owned()
+        } else {
+            format!(
+                "{summary}\nRecent original records (untrusted):\n{}",
+                self.recent
+            )
+        }
     }
     pub fn finish(&self, summary: &str, sources: &str) -> Vec<Value> {
         vec![

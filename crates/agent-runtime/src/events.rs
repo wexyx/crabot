@@ -110,7 +110,7 @@ mod tests {
         assert_eq!(
             RuntimeEvent::ToolStarted {
                 id: "a".into(),
-                name: "read_file".into()
+                name: "read".into()
             }
             .wire_progress()
             .unwrap()

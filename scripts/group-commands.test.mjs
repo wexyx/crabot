@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,modelFixture,act,policy} from './admin-fixture.mjs'
 test('Web commands modify existing groups and tools are visible without execution',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-commands-')),model=await modelFixture();let server
+ const dir=await mkdtemp(join(tmpdir(),'crabot-commands-')),model=await modelFixture();let server
  try{
   server=await start(dir,model.env)
   const p=(await request(server,'/v1/repl')).projects[0].id
@@ -18,8 +18,8 @@ test('Web commands modify existing groups and tools are visible without executio
   await request(server,path,{command:'/remove-agent second'})
   assert.equal((await request(server,path,{command:'/agents'})).members.length,1)
   const catalog=await request(server,`/v1/repl/${p}/tools`)
-  assert.ok(catalog.business.some(t=>t.name==='command_run'))
-  assert.ok(!catalog.management.some(t=>t.name==='command_run'))
+  assert.ok(catalog.business.some(t=>t.name==='shell'))
+  assert.ok(!catalog.management.some(t=>t.name==='shell'))
   assert.ok(catalog.agents.some(a=>a.id==='first'))
   const settings=`/v1/repl/${p}/tool-config/business/first`
   const put=async(path,body)=>{const response=await fetch(server.url+path,{method:'PUT',headers:{'x-admin-token':server.token,'content-type':'application/json'},body:JSON.stringify(body)});return {status:response.status,value:await response.json()}}
@@ -31,7 +31,13 @@ test('Web commands modify existing groups and tools are visible without executio
   assert.equal(configured.status,200,JSON.stringify(configured.value));assert.equal(configured.value.body.name,'Updated team')
   assert.equal(configured.value.body.policy.mode,'pmo');assert.equal(configured.value.body.policy.rounds,3)
   assert.equal((await put(configuration,{expected_version:current.version,policy:current.body.policy})).status,409)
-  const toolPolicy={disabled:['command_run'],external:[{name:'check_repo',description:'Check repository',command:'pwd',enabled:true}]}
+  await request(server,path,{command:'/group mode discussion'})
+  assert.equal((await request(server,`/v1/repl/${p}/groups`)).find(g=>g.key===key).body.policy.mode,'a2a')
+  await request(server,path,{command:'/group mode leader'})
+  assert.equal((await request(server,`/v1/repl/${p}/groups`)).find(g=>g.key===key).body.policy.mode,'pmo')
+  assert.ok(!catalog.business.some(t=>t.name==='skill_read'))
+  assert.ok(!catalog.management.some(t=>t.name==='skill_read'))
+  const toolPolicy={disabled:['shell'],external:[{name:'check_repo',description:'Check repository',command:'pwd',enabled:true}]}
   assert.equal((await put(settings,{expected_version:0,policy:toolPolicy})).status,200)
   assert.equal((await put(settings,{expected_version:0,policy:toolPolicy})).status,409)
   assert.deepEqual((await request(server,settings)).policy,toolPolicy)
@@ -39,11 +45,11 @@ test('Web commands modify existing groups and tools are visible without executio
   const skillPath=`/v1/repl/${p}/skills/business`
   const definition={id:'guide',description:'Test guide',enabled:true,allow_python:false,files:{'SKILL.md':'# Hello'}}
   assert.equal((await put(skillPath,{expected_version:0,definition})).status,200)
-  assert.equal((await request(server,skillPath))[0].definition.id,'guide')
+  assert.ok((await request(server,skillPath)).some(row=>row.definition.id==='guide'))
   assert.equal((await put(skillPath,{expected_version:1,definition:{...definition,allow_python:true}})).status,400)
   await stop(server);server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
   assert.deepEqual((await request(server,settings)).policy,toolPolicy)
-  assert.equal((await request(server,skillPath))[0].definition.id,'guide')
+  assert.ok((await request(server,skillPath)).some(row=>row.definition.id==='guide'))
   assert.equal((await fetch(server.url+settings,{method:'PUT',headers:{'content-type':'application/json',origin:'https://evil.example'},body:JSON.stringify({expected_version:1,policy:{disabled:[],external:[]}})})).status,403)
   assert.equal((await put(settings,{expected_version:1,policy:{disabled:[],external:[]}})).status,200)
   assert.deepEqual((await request(server,settings)).policy.external,[])

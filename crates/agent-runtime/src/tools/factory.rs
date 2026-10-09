@@ -41,6 +41,9 @@ impl ToolFactory {
         for name in context.tool_policy.disabled() {
             registry.unregister(name);
         }
+        // Published last: `find_tools` must describe the registry the model will
+        // actually be offered, not the pre-policy set.
+        context.tool_index().publish(registry.definitions());
         Ok(registry)
     }
 }

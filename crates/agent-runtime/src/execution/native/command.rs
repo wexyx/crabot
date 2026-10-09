@@ -38,7 +38,7 @@ impl NativeCommand {
     pub(crate) fn new(root: &Path) -> Result<Self, String> {
         Ok(Self {
             scratch: tempfile::Builder::new()
-                .prefix("carbot-process-")
+                .prefix("crabot-process-")
                 .tempdir_in(crate::workspace::temporary_dir(root)?)
                 .map_err(|e| e.to_string())?,
         })
@@ -63,8 +63,8 @@ impl NativeCommand {
             .env_clear()
             .env("HOME", &scratch)
             .env("TMPDIR", &scratch)
-            .env("CARBOT_TMP_DIR", crate::workspace::temporary_dir(&root)?)
-            .env("CARBOT_DATA_DIR", crate::paths::data_dir())
+            .env("CRABOT_TMP_DIR", crate::workspace::temporary_dir(&root)?)
+            .env("CRABOT_DATA_DIR", crate::paths::data_dir())
             .env("MAC_CHROMIUM_TMPDIR", &scratch)
             .env("XDG_CONFIG_HOME", scratch.join("config"))
             .env("XDG_CACHE_HOME", scratch.join("cache"))

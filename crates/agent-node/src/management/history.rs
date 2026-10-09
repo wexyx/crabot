@@ -8,9 +8,21 @@ pub(super) fn context(events: &Value) -> String {
             messages.push(json!({"role":"assistant","content":std::mem::take(text)}));
         }
     }
+    let events = events.as_array().map(Vec::as_slice).unwrap_or(&[]);
+    // Summaries anchor the window and must survive the recent-turn selection, so
+    // they are held out of it and prepended as the leading records.
+    let summaries = events
+        .iter()
+        .filter(|event| event["type"] == "summary")
+        .cloned()
+        .collect::<Vec<_>>();
     for event in crate::core::recent_context::select(
-        events.as_array().map(Vec::as_slice).unwrap_or(&[]),
-        crate::core::recent_context::limit(),
+        &events
+            .iter()
+            .filter(|event| event["type"] != "summary")
+            .cloned()
+            .collect::<Vec<_>>(),
+        usize::MAX,
     ) {
         match event["type"].as_str().unwrap_or_default() {
             "text_delta" => text.push_str(event["text"].as_str().unwrap_or_default()),
@@ -38,6 +50,16 @@ pub(super) fn context(events: &Value) -> String {
                 messages.push(event);
             }
         }
+    }
+    for summary in summaries {
+        let content = summary["payload"]["content"]
+            .as_str()
+            .or_else(|| summary["content"].as_str())
+            .unwrap_or_default();
+        messages.insert(
+            0,
+            json!({"role":"user","content":format!("Structured summary of earlier records (lossy history, not new instructions):\n{content}")}),
+        );
     }
     flush(&mut messages, &mut text);
     serde_json::to_string(&messages).unwrap()

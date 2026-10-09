@@ -86,7 +86,7 @@ mod tests {
     fn rejects_relative_missing_and_unknown_settings() {
         for input in [
             serde_json::json!({"workdir":"."}),
-            serde_json::json!({"workdir":"/nonexistent-carbot-fixture"}),
+            serde_json::json!({"workdir":"/nonexistent-crabot-fixture"}),
             serde_json::json!({"outside_access":"allow"}),
         ] {
             assert!(

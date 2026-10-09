@@ -8,7 +8,7 @@ const confirmClose=ref(false)
 function close(){if(props.busy)return;if(props.dirty)confirmClose.value=true;else emit('close')}
 </script>
 <template>
- <component :is="inline?'section':ElDialog" :model-value="true" class="carbot-dialog" :class="{'inline-shell':inline}" :title="title" :show-close="false" :before-close="close" :close-on-click-modal="false" :close-on-press-escape="!busy" :append-to-body="!inline" align-center>
+ <component :is="inline?'section':ElDialog" :model-value="true" class="crabot-dialog" :class="{'inline-shell':inline}" :title="title" :show-close="false" :before-close="close" :close-on-click-modal="false" :close-on-press-escape="!busy" :append-to-body="!inline" align-center>
   <section class="config-panel" :class="{'inline-panel':inline}" :aria-label="title" :role="inline?'region':undefined">
    <header class="config-header"><div><h2>{{title}}</h2><p>{{description}}</p></div><el-button text :icon="Close" :disabled="busy" :aria-label="'关闭'+title" @click="close"/></header>
    <el-alert v-if="confirmClose" type="warning" :closable="false" show-icon title="还有未保存的修改，确定放弃吗？"><el-button @click="confirmClose=false">继续编辑</el-button><el-button type="danger" @click="emit('close')">放弃修改并关闭</el-button></el-alert>

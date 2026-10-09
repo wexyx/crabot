@@ -6,7 +6,7 @@ import {join} from 'node:path'
 import {start,stop,request,modelFixture,policy,history,pause} from './admin-fixture.mjs'
 
 test('permission modes are explicit, persisted, scoped and enforce command approvals',{timeout:60000},async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-permissions-')),model=await modelFixture();let server
+ const dir=await mkdtemp(join(tmpdir(),'crabot-permissions-')),model=await modelFixture();let server
  try{
   server=await start(join(dir,'data'),model.env)
   const p=(await request(server,'/v1/repl')).projects[0].id,base=`/v1/repl/${p}`
@@ -23,7 +23,7 @@ test('permission modes are explicit, persisted, scoped and enforce command appro
   assert.ok((await request(server,listPath)).command_allowlist.includes('printf custom-allowed'))
   const stale=await fetch(server.url+path,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'ask',expected_version:0})});assert.equal(stale.status,409)
   const group=await request(server,base+'/groups',{policy:{...policy('default'),mode:'chat'}})
-  const send=async command=>request(server,`${base}/groups/${group.key}/messages`,{content:'TEST_PLAN:'+JSON.stringify([{name:'command_run',input:{command}}])})
+  const send=async command=>request(server,`${base}/groups/${group.key}/messages`,{content:'TEST_PLAN:'+JSON.stringify([{name:'shell',input:{command}}])})
   const customRun=await send('printf custom-allowed')
   assert.match(JSON.stringify(await history(server,p,customRun.id)),/Fixture complete/)
   const autoRun=await send('pwd')
@@ -52,7 +52,7 @@ test('permission modes are explicit, persisted, scoped and enforce command appro
   const grantedRun=await send('printf conversation-allowed');await history(server,p,grantedRun.id)
   assert.equal((await request(server,'/v1/workspace/approvals')).requests.length,0)
   const other=await request(server,base+'/groups',{policy:{...policy('default'),mode:'chat'}})
-  const otherRun=await request(server,base+'/groups/'+other.key+'/messages',{content:'TEST_PLAN:'+JSON.stringify([{name:'command_run',input:{command:'pwd'}}])})
+  const otherRun=await request(server,base+'/groups/'+other.key+'/messages',{content:'TEST_PLAN:'+JSON.stringify([{name:'shell',input:{command:'pwd'}}])})
   for(let i=0;i<100;i++){approvals=(await request(server,'/v1/workspace/approvals')).requests;if(approvals.length)break;await pause(25)}
   assert.equal(approvals.length,1);assert.equal(approvals[0].conversation_id,p+':'+other.key)
   await request(server,'/v1/workspace/approvals/'+approvals[0].id,{allow:false});await history(server,p,otherRun.id)

@@ -113,13 +113,6 @@ pub(super) async fn request(
 ) -> Result<(), String> {
     enqueue(workdir, path, operation, None).await
 }
-pub(crate) async fn confirm_browser(workdir: &std::path::Path, url: &str) -> Result<(), String> {
-    if crate::permissions::PermissionMode::current() == crate::permissions::PermissionMode::Full {
-        return Ok(());
-    }
-    // Shell allowlists/session grants do not silently authorize host browser execution.
-    enqueue(workdir,workdir,&format!("浏览器独立执行：{url}。浏览器不受 Carbot 目录沙箱限制，拥有当前用户文件权限；保留 Chromium 沙箱并使用临时配置，不读取个人 Cookie。"),None).await
-}
 pub(crate) async fn confirm_command(
     workdir: &std::path::Path,
     command: &str,

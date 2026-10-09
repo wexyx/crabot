@@ -8,9 +8,9 @@ import {tmpdir} from 'node:os'
 import {join,resolve} from 'node:path'
 import {modelFixture,pause} from './admin-fixture.mjs'
 test('CLI starts clean, history replays on request, and Web reuses the saved port',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-cli-history-')),model=await modelFixture();let item
+ const dir=await mkdtemp(join(tmpdir(),'crabot-cli-history-')),model=await modelFixture();let item
  const launch=(args=[])=>{
-  const child=spawn(resolve('target/debug/agent-node'),['--cli',...args],{cwd:dir,env:{PATH:process.env.PATH,CARBOT_DATA_DIR:dir,...model.env},stdio:['pipe','pipe','pipe']})
+  const child=spawn(resolve('target/debug/agent-node'),['--cli',...args],{cwd:dir,env:{PATH:process.env.PATH,CRABOT_DATA_DIR:dir,...model.env},stdio:['pipe','pipe','pipe']})
   const result={child,output:''};child.stdout.on('data',b=>result.output+=b);child.stderr.on('data',b=>result.output+=b);return result
  }
  const wait=async text=>{for(let i=0;i<200;i++){if(item.output.includes(text))return;if(item.child.exitCode!==null)throw Error(item.output);await pause(20)}throw Error('missing '+text+': '+item.output)}

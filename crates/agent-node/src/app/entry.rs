@@ -17,10 +17,14 @@ pub fn run() {
             let store = match crate::storage::open(&dir).await {
                 Ok(store) => store,
                 Err(error) => {
-                    eprintln!("Cannot start Carbot instance: {error}");
+                    eprintln!("Cannot start Crabot instance: {error}");
                     std::process::exit(2);
                 }
             };
+            if let Err(error) = agent_runtime::prompts::PromptStore::new(&dir).validate_all() {
+                eprintln!("Cannot load system prompts: {error}");
+                std::process::exit(2);
+            }
             match crate::configuration::startup().await {
                 Ok(config) => application::serve(interactive, config, store).await,
                 Err(error) => {

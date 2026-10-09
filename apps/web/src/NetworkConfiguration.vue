@@ -12,7 +12,7 @@ onMounted(()=>{load();timer=setInterval(()=>{if(!document.hidden)load()},5000)})
 onBeforeUnmount(()=>{alive=false;clearInterval(timer)})
 </script>
 <template>
- <ConfigPanel title="组网" eyebrow="CONNECTIONS" description="管理当前 Carbot 与其它节点的连接，独立于 Agent 配置。" inline :busy="busy" @close="$emit('close')">
+ <ConfigPanel title="组网" eyebrow="CONNECTIONS" description="管理当前 Crabot 与其它节点的连接，独立于 Agent 配置。" inline :busy="busy" @close="$emit('close')">
   <div class="config-detail network-config"><p v-if="error" class="config-alert danger" role="alert">{{error}}</p>
    <PeerConnections :request="request" :project="project" :mounts="mounts" :busy="busy||!!pending" @pending="pending=$event" @changed="load"/>
    <el-alert type="warning" :closable="false" show-icon v-if="pending" class="approval"><h3>确认连接授权</h3><p>{{pending.warning}}</p><p>{{pending.input?.url}}</p><el-button type="primary" native-type="button" :disabled="busy" @click="decide(true)">确认连接</el-button><el-button type="default" native-type="button" class="secondary" :disabled="busy" @click="decide(false)">拒绝</el-button></el-alert>

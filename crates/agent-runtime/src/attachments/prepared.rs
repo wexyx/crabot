@@ -40,7 +40,7 @@ impl PreparedAttachments {
         }
         let temporary = crate::workspace::temporary_dir(root)?;
         let staging = tempfile::Builder::new()
-            .prefix("carbot-attachments-")
+            .prefix("crabot-attachments-")
             .tempdir_in(&temporary)
             .map_err(|e| e.to_string())?;
         let mut total = 0;
@@ -95,10 +95,5 @@ impl PreparedAttachments {
     pub(crate) fn images<T>(f: impl FnOnce(&[AttachmentImage]) -> T) -> T {
         let current = CURRENT.try_with(Arc::clone).ok();
         f(current.as_ref().map_or(&[], |p| p.images.as_slice()))
-    }
-    pub(crate) fn permits(path: &Path) -> bool {
-        CURRENT
-            .try_with(|p| p.paths.iter().any(|v| v == path))
-            .unwrap_or(false)
     }
 }

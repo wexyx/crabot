@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,pause,modelFixture,act,policy,history} from './admin-fixture.mjs'
 test('management is loopback-only and ignores obsolete admin tokens',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-auth-'));let server
+  const dir=await mkdtemp(join(tmpdir(),'crabot-auth-'));let server
   try{
     server=await start(dir,{ADMIN_TOKEN:'',ADMIN_AGENT_PROVIDER:'mock'})
     assert.equal((await fetch(server.url+'/v1/repl')).status,200)
@@ -19,8 +19,8 @@ test('management is loopback-only and ignores obsolete admin tokens',async()=>{
     assert.ok((await request(server,'/v1/repl')).projects.length)
   }finally{await stop(server);await rm(dir,{recursive:true,force:true})}
 })
-test('one admin chat appends JSONL, paginates, and migrates legacy snapshots with backup',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-jsonl-'));let server
+test('admin chat persists in the index, paginates, and survives restart',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'crabot-jsonl-'));let server
   try{
     server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
     const p=(await request(server,'/v1/repl')).projects[0].id,base='/v1/admin-agent/'+p+'/sessions'
@@ -30,31 +30,23 @@ test('one admin chat appends JSONL, paginates, and migrates legacy snapshots wit
       await request(server,base+'/'+one.id+'/messages',{content})
       for(let i=0;i<100;i++){if((await request(server,base+'/'+one.id)).status!=='running')break;await pause(20)}
     }
-    const logs=await request(server,'/v1/repl/'+p+'/chats/admin/logs')
+    const logs=await request(server,'/v1/repl/'+p+'/chats/admin/history')
     assert.deepEqual(logs.events.filter(e=>e.type==='user').map(e=>e.content),['first','second'])
-    assert.equal(logs.files.length,1)
-    const page=await request(server,'/v1/repl/'+p+'/chats/admin/logs?limit=2')
-    const older=await request(server,'/v1/repl/'+p+'/chats/admin/logs?before='+page.events[0].seq)
+    assert.equal(logs.files,undefined)
+    const page=await request(server,'/v1/repl/'+p+'/chats/admin/history?limit=2')
+    const older=await request(server,'/v1/repl/'+p+'/chats/admin/history?before='+page.events[0].seq)
     assert.equal(older.events.at(-1).seq+1,page.events[0].seq)
-    const raw=await readFile(join(dir,'chats',p,Buffer.from('admin').toString('hex'),logs.files[0].name),'utf8')
-    assert.deepEqual(raw.trim().split('\n').map(s=>JSON.parse(s)),logs.events)
+    assert.ok((await readdir(join(dir,'knowledge',p))).includes('graph.db'))
+    assert.ok(!(await readdir(dir)).includes('chats'))
     await stop(server)
-    const state=await readState(dir)
-    assert.equal(state.collections.management_sessions[p].events,undefined)
-    assert.equal(state.collections.history,undefined)
-    const legacy=join(dir,'legacy');await mkdir(legacy)
-    state.collections.management_sessions[p].events=logs.events
-    await writeFile(join(legacy,'state.json'),JSON.stringify(state))
-    server=await start(legacy,{ADMIN_AGENT_PROVIDER:'mock'})
-    const restored=await request(server,'/v1/repl/'+p+'/chats/admin/logs')
-    assert.deepEqual(restored.events.filter(e=>e.type==='user').map(e=>e.content),['first','second'])
-    assert.ok((await readdir(legacy)).includes('state.before-chat-jsonl.json'))
-    await stop(server);server=await start(legacy,{ADMIN_AGENT_PROVIDER:'mock'})
-    assert.equal((await request(server,'/v1/repl/'+p+'/chats/admin/logs')).events.length,logs.events.length)
+    server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
+    const restored=await request(server,'/v1/repl/'+p+'/chats/admin/history')
+    assert.deepEqual(restored.events,logs.events)
+    assert.equal((await fetch(server.url+'/v1/repl/'+p+'/chats/admin/logs')).status,404)
   }finally{await stop(server);await rm(dir,{recursive:true,force:true})}
 })
 test('group ID owns all rounds without continuation links',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'carbot-group-log-')),model=await modelFixture();let server
+  const dir=await mkdtemp(join(tmpdir(),'crabot-group-log-')),model=await modelFixture();let server
   try{
     server=await start(dir,model.env)
     const p=(await request(server,'/v1/repl')).projects[0].id
@@ -64,8 +56,8 @@ test('group ID owns all rounds without continuation links',async()=>{
       const run=await request(server,`/v1/repl/${p}/groups/${group}/messages`,{content})
       await history(server,p,run.id)
     }
-    const log=await request(server,`/v1/repl/${p}/chats/${group}/logs`)
+    const log=await request(server,`/v1/repl/${p}/chats/${group}/history`)
     assert.deepEqual(log.events.filter(e=>e.type==='message.created').map(e=>e.content),['hello round one','hello round two'])
-    assert.equal(log.files.length,1);assert.equal(log.active_run,null)
+    assert.equal(log.files,undefined);assert.equal(log.active_run,null)
   }finally{await stop(server);await model.close();await rm(dir,{recursive:true,force:true})}
 })

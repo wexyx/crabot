@@ -8,10 +8,10 @@ const runtime=runtimeDirectory()
 process.env.PUPPETEER_CACHE_DIR=join(runtime,'browsers')
 const require=createRequire(join(runtime,'package.json'))
 async function temporaryRoot(){
- const alias=process.env.CARBOT_INSTANCE||''
- if(alias&&!/^[a-zA-Z0-9_-]{1,64}$/.test(alias))throw Error('Invalid Carbot instance name')
- const root=process.env.CARBOT_TMP_DIR||join(process.cwd(),alias?'.carbot_'+alias:'.carbot','tmp')
- if(!process.env.CARBOT_TMP_DIR){
+ const alias=process.env.CRABOT_INSTANCE||''
+ if(alias&&!/^[a-zA-Z0-9_-]{1,64}$/.test(alias))throw Error('Invalid Crabot instance name')
+ const root=process.env.CRABOT_TMP_DIR||join(process.cwd(),alias?'.crabot_'+alias:'.crabot','tmp')
+ if(!process.env.CRABOT_TMP_DIR){
   const parent=dirname(root)
   await mkdir(parent,{recursive:true})
   if((await lstat(parent)).isSymbolicLink())throw Error('Temporary directory cannot be a symlink')
@@ -25,7 +25,7 @@ export async function withBrowser(work){
  let puppeteer
  try{puppeteer=(await import(pathToFileURL(require.resolve('puppeteer')).href)).default}
  catch{throw Error('请先运行此 Skill 的 node install.mjs 安装 Puppeteer 和浏览器。')}
- const profile=await mkdtemp(join(await temporaryRoot(),'carbot-browser-'))
+ const profile=await mkdtemp(join(await temporaryRoot(),'crabot-browser-'))
  let browser
  try{
   browser=await puppeteer.launch({headless:'shell',userDataDir:profile,env:{...process.env,MAC_CHROMIUM_TMPDIR:profile},args:['--disable-gpu']})
@@ -37,7 +37,8 @@ export async function withBrowser(work){
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [url,output]=process.argv.slice(2)
- if(!url||!['http:','https:'].includes(new URL(url).protocol))throw Error('用法：node browser.mjs HTTP_URL [截图路径]')
+ const address=url?new URL(url):null
+ if(!address||!['http:','https:'].includes(address.protocol)||address.username||address.password)throw Error('用法：node browser.mjs HTTP_URL [截图路径]，URL 不可包含凭据')
  const outputDir=output?await mkdtemp(join(await temporaryRoot(),'browser-output-')):null
  const target=outputDir?join(outputDir,basename(output)):null
  await withBrowser(async page=>{

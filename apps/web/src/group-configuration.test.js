@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {validateGroupConfiguration} from './group-configuration.js'
+import {modes,validateGroupConfiguration} from './group-configuration.js'
+test('stored modes use the new discussion and Leader display names',()=>{
+ assert.equal(modes.find(m=>m.id==='a2a').name,'讨论模式')
+ assert.equal(modes.find(m=>m.id==='pmo').name,'Leader 模式')
+ assert.match(modes.find(m=>m.id==='a2a').description,/职责|让出/)
+})
 test('complete group configuration validates modes, leader, order and limits',()=>{
  const value={name:'Team',policy:{mode:'pmo',members:[{path:['a'],role:'owner'}],leader:null,rounds:2,instructions:'plan'}}
  assert.match(validateGroupConfiguration(value),/Leader/)

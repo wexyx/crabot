@@ -18,13 +18,14 @@ test('tool JSON is folded into one process row; actual JSON answers remain answe
 
 test('compact process lines show actions without dumping JSON results', async()=>{
   const {processSummary}=await import('./process-summary.js')
-  assert.equal(processSummary({type:'tool',name:'command_run',input:'{"command":"rg test"}',text:'{"secret":"result"}',pending:false},false),'已运行 rg test')
+  assert.equal(processSummary({type:'tool',name:'shell',input:'{"command":"rg test"}',text:'{"secret":"result"}',pending:false},false),'已运行 rg test')
   assert.equal(processSummary({type:'tool',name:'python',pending:true},true),'正在运行 python')
   assert.equal(processSummary({type:'process',label:'context.compact',pending:true},true),'正在压缩上下文')
 })
 
-test('live status keeps a short tool name last, without command arguments',async()=>{
+test('live status includes a concise action after the tool name',async()=>{
  const {compactProcessSummary}=await import('./process-summary.js')
- assert.equal(compactProcessSummary({type:'tool',name:'command_run',input:JSON.stringify({command:'ls -la /long/private/path'}),pending:true}),'执行中 · command_run · ls')
- assert.equal(compactProcessSummary({type:'tool',name:'python_run',pending:true}),'执行中 · python')
+ assert.equal(compactProcessSummary({type:'tool',name:'shell',input:JSON.stringify({command:'ls -la /long/private/path'}),pending:true}),'执行中 · shell · ls -la …/private/path')
+ assert.equal(compactProcessSummary({type:'tool',name:'shell',input:JSON.stringify({command:'python3 script.py'}),pending:true}),'执行中 · shell · python3 script.py')
+ assert.equal(compactProcessSummary({type:'tool',name:'find',input:JSON.stringify({target:'skill',id:'browser-automation'}),pending:true}),'执行中 · find · Skill · browser-automation')
 })

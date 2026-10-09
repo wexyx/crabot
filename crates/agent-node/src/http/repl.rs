@@ -16,16 +16,12 @@ pub(crate) fn routes(manager: Arc<Manager>) -> Router<AppState> {
     Router::new()
         .route("/v1/repl", get(index))
         .route(
-            "/v1/repl/{project}/chats/{chat}/logs/files/{name}",
-            get(super::chat_logs::file),
-        )
-        .route(
-            "/v1/repl/{project}/chats/{chat}/logs",
-            get(super::chat_logs::history),
+            "/v1/repl/{project}/chats/{chat}/history",
+            get(super::chat_history::history),
         )
         .route(
             "/v1/repl/{project}/chats/{chat}/events",
-            get(super::chat_logs::events),
+            get(super::chat_history::events),
         )
         .route("/v1/repl/{project}/groups", get(groups).post(create_group))
         .route("/v1/repl/{project}/groups/{group}", delete(delete_chat))

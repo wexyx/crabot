@@ -1,6 +1,6 @@
 //! End-to-end launch of the real OpenCode CLI through the public factory.
 //! Opt-in: it needs the binary installed, a reachable model and network, so it never
-//! runs in the default suite. Set `CARBOT_OPENCODE_E2E=1` and `OPENCODE_MODEL`.
+//! runs in the default suite. Set `CRABOT_OPENCODE_E2E=1` and `OPENCODE_MODEL`.
 use agent_runtime::config::{OpenCodeConfig, RuntimeConfig};
 use agent_runtime::{RuntimeFactory, RuntimeKind};
 use std::path::PathBuf;
@@ -26,7 +26,7 @@ fn the_factory_builds_opencode_and_keeps_managed_flags_out_of_the_launcher() {
         RuntimeFactory::from_config(RuntimeConfig::OpenCode(config("/bin/echo", "", false)))
             .unwrap();
     assert_eq!(runtime.kind(), RuntimeKind::OpenCode);
-    // Task framing, output format, approval and continuity belong to Carbot; a configured
+    // Task framing, output format, approval and continuity belong to Crabot; a configured
     // launcher may not smuggle them in, or it would silently take over the run.
     for flag in ["--format", "--auto", "run", "--thinking", "--prompt"] {
         assert!(
@@ -36,7 +36,7 @@ fn the_factory_builds_opencode_and_keeps_managed_flags_out_of_the_launcher() {
                 false
             )))
             .is_err(),
-            "{flag} must stay under Carbot's control"
+            "{flag} must stay under Crabot's control"
         );
     }
     // A model name is not a reserved flag and must still pass through.
@@ -52,8 +52,8 @@ fn the_factory_builds_opencode_and_keeps_managed_flags_out_of_the_launcher() {
 
 #[tokio::test]
 async fn a_real_opencode_run_streams_text_and_returns_the_same_answer() {
-    if std::env::var("CARBOT_OPENCODE_E2E").as_deref() != Ok("1") {
-        eprintln!("skipped: set CARBOT_OPENCODE_E2E=1 to exercise the real OpenCode CLI");
+    if std::env::var("CRABOT_OPENCODE_E2E").as_deref() != Ok("1") {
+        eprintln!("skipped: set CRABOT_OPENCODE_E2E=1 to exercise the real OpenCode CLI");
         return;
     }
     let model = std::env::var("OPENCODE_MODEL").unwrap_or_default();

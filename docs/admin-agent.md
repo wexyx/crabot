@@ -3,13 +3,13 @@
 ```text
 Web 可视化 REPL ─┐
                  ├─ 对话/事件/确认 ─ AdminAgent ─ 管理 Skill + Tool ─ Core
-carbot 终端 ──┘                                               │
+crabot 终端 ──┘                                               │
                                                         群聊 / 业务 Agent
                                                                │
                                                        业务 Skill + Tool
 ```
 
-两套能力包复用 AgentRuntime、Tool trait、Inventory、SkillCatalog 和事件持久化，不复制 Harness 或 Tool 调用逻辑。AdminAgent 支持 Carbot、Codex、Claude 和测试用 Mock。CLI Provider 通过共享 ToolRuntime 的 JSON 工具调用循环调用同一套 management 注册表，不另建管理协议。运行目录是独立临时目录，不是业务工作目录；工厂固定 Codex 为 read-only、Claude 为 plan，不再套 Carbot 外层系统沙箱。CLI 的认证文件读取仍需要目录策略授权，或预先提供对应 CLI 的环境认证信息。
+两套能力包复用 AgentRuntime、Tool trait、Inventory、SkillCatalog 和事件持久化，不复制 Harness 或 Tool 调用逻辑。AdminAgent 支持 Crabot、Codex、Claude 和测试用 Mock。CLI Provider 通过共享 ToolRuntime 的 JSON 工具调用循环调用同一套 management 注册表，不另建管理协议。运行目录是独立临时目录，不是业务工作目录；工厂固定 Codex 为 read-only、Claude 为 plan，不再套 Crabot 外层系统沙箱。CLI 的认证文件读取仍需要目录策略授权，或预先提供对应 CLI 的环境认证信息。
 
 缺少或无效配置时，终端启动自动进入配置向导；运行后 `/admin-config` 和 Web 的「AdminAgent 配置」可切换 Provider。配置保存在数据目录下的 default-agent.json（0600，明文密钥），环境变量优先。基础配置只允许用户操作，不注册为模型工具。切换时拒绝存在活跃管理任务的情况，保存成功后新消息使用新配置；历史不删除。无终端时配置错误返回非零退出码。
 
@@ -56,11 +56,11 @@ carbot 终端 ──┘                                               │
 | POST /v1/admin-agent/{project}/approvals/{id} | 人确认：allow 布尔值，单次生效 |
 | GET/POST /v1/workspace/approvals[/{id}] | 宿主目录访问审批 |
 
-事件包含递增 seq 以及 user / text_delta / tool_started / tool_finished / context_checkpoint / completed / failed。确认执行结果单独持久化，不自动发起额外模型调用；用户可以继续询问当前状态。管理对话单会话串行，最多 8 个并发会话；每项目一个固定管理聊天；历史追加到小时 JSONL，模型上下文读取有大小上限，完整历史保留在日志中。
+事件包含递增 seq 以及 user / text_delta / tool_started / tool_finished / context_checkpoint / completed / failed。确认执行结果单独持久化，不自动发起额外模型调用；用户可以继续询问当前状态。管理对话单会话串行，最多 8 个并发会话；每项目一个固定管理聊天；历史写入知识索引，模型上下文读取有大小上限，完整历史保留在索引中。
 
 活跃文本可能先展示、后批量持久化；硬崩溃可能丢失尚未提交的尾部，进程重启后应先重读完整会话历史并重置客户端游标，不复用崩溃前的临时 seq。完成通知仅在终态持久化成功后发送。磁盘故障会报告失败，不伪装完成；修复存储并重启后再继续受影响会话。正常中断会取消模型执行并刷新已接收文本。SSE 建连立即发送注释帧，不等待第一条消息或心跳。
 
-内置管理指南直接装入上下文，不再强制每次调用 skill_read。简单问候直接回答，仅需要当前节点数据时才查询工具；其他 Skill 仍按相关性读取。
+内置管理指南直接装入上下文，不再强制每次用 find 加载指南。简单问候直接回答，仅需要当前节点数据时才查询工具；其他 Skill 仍按相关性读取。
 
 A2A 保留 /v1/client/register、connect、events、control-results 等机器协议，用一次性邀请注册 AK/SK，然后子节点主动建立连接。它们不是恢复旧管理 CRUD 的后门。Web 和 CLI 不经这些接口管理本机。
 

@@ -98,7 +98,6 @@ impl Data {
     }
 }
 struct Inner {
-    logs: super::ChatLog,
     data: std::sync::Mutex<Data>,
     /// Serializes durable commits so the journal sequence stays ordered and a rejected
     /// write can roll back without another transaction interleaving.
@@ -120,15 +119,11 @@ impl Store {
     #[cfg(test)]
     pub fn memory() -> Self {
         Self(Arc::new(Inner {
-            logs: super::ChatLog::temporary(),
             data: Default::default(),
             commit: Default::default(),
             file: None,
             _lock: None,
         }))
-    }
-    pub(crate) fn logs(&self) -> &super::ChatLog {
-        &self.0.logs
     }
     pub(crate) fn skill_row(&self, collection: &str, row: &Value) -> Result<Value, String> {
         match self.0.file.as_ref().and_then(|p| p.parent()) {
@@ -271,28 +266,6 @@ fn private_file(path: &FilePath, exclusive: bool) -> std::io::Result<File> {
     }
     options.open(path)
 }
-fn atomic_save(path: &FilePath, data: &Data) -> std::io::Result<()> {
-    let temporary = path.with_file_name(format!("state.{}.tmp", Uuid::new_v4()));
-    let result = (|| {
-        let mut file = private_file(&temporary, true)?;
-        serde_json::to_writer_pretty(&mut file, data)?;
-        file.write_all(b"\n")?;
-        file.sync_all()?;
-        std::fs::rename(&temporary, path)?;
-        // The rename is already committed. Keep memory consistent if directory fsync fails.
-        #[cfg(unix)]
-        if let Some(parent) = path.parent() {
-            if let Err(e) = File::open(parent).and_then(|d| d.sync_all()) {
-                eprintln!("warning: directory sync failed: {e}");
-            }
-        }
-        Ok(())
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temporary);
-    }
-    result
-}
 pub async fn open(dir: &FilePath) -> Result<Store, String> {
     if !dir.exists() {
         let mut builder = std::fs::DirBuilder::new();
@@ -307,14 +280,14 @@ pub async fn open(dir: &FilePath) -> Result<Store, String> {
     let mut lock = private_file(&dir.join("store.lock"), false).map_err(|e| e.to_string())?;
     lock.try_lock_exclusive().map_err(|_| {
         let owner=std::fs::read_to_string(dir.join("store.lock")).unwrap_or_default();
-        format!("data directory {} is already in use by another Carbot ({owner}). Use another --name or close the existing instance.",dir.display())
+        format!("data directory {} is already in use by another Crabot ({owner}). Use another --name or close the existing instance.",dir.display())
     })?;
     lock.set_len(0).map_err(|e| e.to_string())?;
     write!(
         lock,
         "pid={} instance={}",
         std::process::id(),
-        std::env::var("CARBOT_INSTANCE").unwrap_or_else(|_| "default".into())
+        std::env::var("CRABOT_INSTANCE").unwrap_or_else(|_| "default".into())
     )
     .map_err(|e| e.to_string())?;
     lock.sync_all().map_err(|e| e.to_string())?;
@@ -328,10 +301,7 @@ pub async fn open(dir: &FilePath) -> Result<Store, String> {
     if data.format_version != 1 {
         return Err("unsupported state.json format version".into());
     }
-    let logs = super::ChatLog::open(dir.join("chats"));
-    if super::chat_migration::migrate(dir, &mut data, &logs).await? {
-        atomic_save(&path, &data).map_err(|e| e.to_string())?;
-    }
+    // Chat records live only in the knowledge index now; the JSONL layer is gone.
     let journal = dir.join("state.jsonl");
     super::state_journal::replay(&journal, &mut data)?;
     for collection in ["skills", "management_skills", "capability_library"] {
@@ -342,7 +312,6 @@ pub async fn open(dir: &FilePath) -> Result<Store, String> {
         }
     }
     Ok(Store(Arc::new(Inner {
-        logs,
         data: std::sync::Mutex::new(data),
         commit: Default::default(),
         file: Some(journal),
@@ -381,7 +350,7 @@ mod tests {
     struct Temp(PathBuf);
     impl Temp {
         fn new() -> Self {
-            Self(std::env::temp_dir().join(format!("carbot-files-test-{}", Uuid::new_v4())))
+            Self(std::env::temp_dir().join(format!("crabot-files-test-{}", Uuid::new_v4())))
         }
     }
     impl Drop for Temp {

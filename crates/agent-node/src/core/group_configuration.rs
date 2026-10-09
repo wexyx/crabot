@@ -18,7 +18,13 @@ impl Core {
         update["key"] = json!(key);
         update["policy"] = json!(policy);
         let updated = self.control(project, "group.update", update).await?;
-        self.state().store.logs().append(project,format!("group:{key}"),vec![json!({"type":"command.result","content":"群配置已更新；后续轮次使用新策略。","version":updated["version"]})]).await?;
+        crate::storage::knowledge::persist(
+            project,
+            &format!("group:{key}"),
+            &[
+                json!({"type":"command.result","content":"群配置已更新；后续轮次使用新策略。","version":updated["version"]}),
+            ],
+        )?;
         Ok(updated)
     }
 }

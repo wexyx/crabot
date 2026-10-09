@@ -19,5 +19,10 @@ pub(super) async fn run(context: &ToolContext, command: &str) -> Result<Value, S
     if root.canonicalize().map_err(|e| e.to_string())? != root {
         return Err("workspace changed during approval".into());
     }
-    crate::execution::execute_command(root, command.into(), profile).await
+    let bridge = crate::skills::SkillBridge::start(root.clone(), context.skills()).await?;
+    let environment = bridge.as_ref().map(|b| b.environment()).unwrap_or_default();
+    let result =
+        crate::execution::execute_command(root, command.into(), profile, environment).await;
+    drop(bridge);
+    result
 }

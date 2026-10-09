@@ -16,7 +16,7 @@ pub struct OpenCodeConfig {
     /// Run against a private OpenCode server instead of the shared background service.
     ///
     /// The shared service is cheaper by roughly a second per turn when a client can
-    /// reach it, but Carbot launches OpenCode with a scrubbed HOME, and the service
+    /// reach it, but Crabot launches OpenCode with a scrubbed HOME, and the service
     /// registration lives in that HOME. Without it the client cannot find the service
     /// and waits on starting one instead of failing fast, so the private server is the
     /// default here. Clear `OPENCODE_STANDALONE` only where the registration is
@@ -41,7 +41,7 @@ impl OpenCodeConfig {
     }
     pub(crate) fn launch(&self) -> Result<super::super::launch_command::LaunchCommand, String> {
         let command = super::super::launch_command::LaunchCommand::parse(&self.binary)?;
-        // Carbot owns task framing, session continuity, output format and approval.
+        // Crabot owns task framing, session continuity, output format and approval.
         command.reject(&[
             "run",
             "--format",

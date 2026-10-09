@@ -1,5 +1,11 @@
 use serde_json::Value;
-pub(super) const DEFAULT: &str = "结论先行，只回答最重要的信息；默认简洁，不重复背景或长篇解释。除非用户要求展开，否则只给必要的结论、风险和下一步。群聊中不要复述其他成员已说过的内容。";
+pub(super) const DEFAULT: &str = include_str!("../../../../conf/response.md");
+pub(super) fn current(configured: Option<&str>) -> Result<String, String> {
+    match configured {
+        Some(text) if text.trim() != DEFAULT.trim() => Ok(text.to_owned()),
+        _ => agent_runtime::prompts::PromptStore::instance().read("response"),
+    }
+}
 pub(super) fn resolve(input: &Value, previous: Option<&Value>) -> Result<String, String> {
     match input.get("response_instructions") {
         Some(value) => {

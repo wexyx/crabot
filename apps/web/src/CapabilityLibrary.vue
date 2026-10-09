@@ -29,7 +29,7 @@ function name(resource){return resource.definition.name||resource.definition.id}
 let loadVersion=0
 async function load(){const version=++loadVersion;targetReady.value=false;const result=await props.request(endpoint()+queryString());if(version!==loadVersion)return;data.value=result;if(!data.value.rows.some(r=>r.resource.id===selected.value))selected.value=data.value.rows[0]?.resource.id||'';targetReady.value=true}
 async function perform(action){if(busy.value)return;busy.value=true;error.value='';notice.value='';try{await action()}catch(e){error.value=e.message}finally{busy.value=false}}
-watch(()=>props.kind,()=>{panel.value='';editing.value=false;selected.value='';query.value='';file.value='SKILL.md';testMode.value='read';testScript.value='';load().catch(e=>{error.value=e.message})})
+watch(()=>props.kind,()=>{panel.value='';editing.value=false;selected.value='';query.value='';file.value='SKILL.md';skillDirectory.value='';testScript.value='';load().catch(e=>{error.value=e.message})})
 onMounted(()=>perform(async()=>{const index=await props.request('/v1/repl');projectCatalog.value=index.collaboration_projects||[];await load()}))
 async function changeContext(){
  const row=projectCatalog.value.find(p=>p.key===contextGroup.value)
@@ -80,9 +80,12 @@ function addFile(){
  draft.value.files[path]='';file.value=path;newFile.value='';preview.value=false
 }
 const content=computed(()=>editing.value?draft.value:current.value?.resource.definition)
-const testMode=ref('read'),testScript=ref('')
-const scripts=computed(()=>Object.keys(content.value?.files||{}).filter(f=>f.endsWith('.py')))
-watch([testMode,scripts],()=>{if(testMode.value==='python'&&!scripts.value.includes(testScript.value))testScript.value=scripts.value[0]||''})
+const skillDirectory=ref(''),testScript=ref('')
+watch([selected,contextGroup,agent,()=>current.value?.resource.version],()=>{skillDirectory.value='';testScript.value=''})
+const quote=value=>"'"+String(value).replaceAll("'","'\\''")+"'"
+const scriptCommand=computed(()=>{const file=testScript.value;const interpreter=file.endsWith('.py')?'python3':file.endsWith('.mjs')||file.endsWith('.js')?'node':'sh';return interpreter+' '+quote(skillDirectory.value+'/'+file)})
+const scripts=computed(()=>Object.keys(content.value?.files||{}).filter(f=>/\.(py|mjs|js|sh)$/.test(f)))
+watch(scripts,()=>{if(!scripts.value.includes(testScript.value))testScript.value=scripts.value[0]||''})
 </script>
 <template>
 <ConfigPanel inline :title="(scope==='management'?'管理':'项目')+'能力库'" eyebrow="SHARED CAPABILITIES" description="统一维护工具与 Skill，在 Agent 表格中直接启用或停用。" :busy="busy" :dirty="dirty" @close="$emit('close')">
@@ -103,7 +106,7 @@ watch([testMode,scripts],()=>{if(testMode.value==='python'&&!scripts.value.inclu
  </div>
  <el-drawer v-model="drawerOpen" :before-close="closeDrawer" direction="rtl" size="min(760px,100vw)" :title="panel==='test'?'测试运行':panel==='rules'?'生效规则':'能力详情'" append-to-body destroy-on-close class="capability-drawer">
  <div v-if="error" class="config-alert danger" role="alert">{{error}}</div><div v-if="notice" class="config-alert success" role="status">{{notice}}</div>
- <label v-if="panel==='test'" class="field-stack">{{kind==='tool'?'选择工具':'选择 Skill'}}<el-select v-model="selected" filterable :disabled="busy" aria-label="选择测试能力" @change="()=>{file='SKILL.md';testMode='read';testScript=''}"><el-option v-for="row in data.rows" :key="row.resource.id" :value="row.resource.id" :label="name(row.resource)"/></el-select></label>
+ <label v-if="panel==='test'" class="field-stack">{{kind==='tool'?'选择工具':'选择 Skill'}}<el-select v-model="selected" filterable :disabled="busy" aria-label="选择测试能力" @change="()=>{file='SKILL.md';skillDirectory='';testScript=''}"><el-option v-for="row in data.rows" :key="row.resource.id" :value="row.resource.id" :label="name(row.resource)"/></el-select></label>
   <section class="config-detail">
    <el-form v-if="editing" @submit.prevent="save" label-position="top"><div class="section-heading"><h3>{{current?'编辑统一定义':'新增统一定义'}}</h3><p>内容修改会影响所有引用位置；启用范围在保存后单独设置。</p></div>
     <fieldset class="config-fields" :disabled="busy"><div class="form-grid"><label>{{kind==='skill'?'Skill ID':'工具名'}}<el-input v-if="kind==='skill'" v-model="draft.id" :readonly="!!current" required pattern="[a-zA-Z0-9_-]{1,64}" /><el-input v-else v-model="draft.name" :readonly="!!current" required pattern="[a-zA-Z0-9_]{1,64}" /></label><label>用途描述<el-input v-model="draft.description" required maxlength="2048" /></label></div>
@@ -132,10 +135,13 @@ watch([testMode,scripts],()=>{if(testMode.value==='python'&&!scripts.value.inclu
     <div v-if="panel==='detail'&&!current.resource.readonly" class="editor-actions"><el-button type="default" native-type="button" class="quiet-button destructive" :disabled="busy" @click="remove=true">删除统一定义</el-button><el-button type="default" native-type="button" class="secondary" :disabled="busy" @click="edit()">编辑定义</el-button></div>
     <div v-if="remove" class="config-alert warning">删除会影响所有项目中对此定义的引用。<el-button type="primary" native-type="button" :disabled="busy" @click="deleteResource">确认删除</el-button><el-button type="default" native-type="button" class="secondary" @click="remove=false">取消</el-button></div>
     <div v-if="panel==='test'" class="skill-test-options"><div class="section-heading"><h4>在当前项目与 Agent 中试运行</h4><p>使用这里显示的最终启用状态；不绕过执行权限。</p></div>
-     <div v-if="kind==='skill'" class="form-grid"><label>测试类型<el-select v-model="testMode"><el-option value="read" :label="&quot;加载 SKILL.md&quot;" /><el-option v-if="scope==='business'&&scripts.length" value="python" :label="&quot;执行 Python&quot;" /></el-select></label><label v-if="testMode==='python'">脚本<el-select v-model="testScript"><el-option value="" :label="&quot;选择脚本&quot;" /><el-option v-for="path in scripts" :key="path" :label="(path)" :value="(path)" /></el-select></label></div>
-     <p v-if="kind==='skill'&&testMode==='python'" class="muted">已选择脚本。args 是命令行参数数组，例如 ["--input", "./sample.txt"]；不需要参数时保留 []，具体以 SKILL.md 和脚本说明为准。</p>
+     <p v-if="kind==='skill'" class="muted">先加载 Skill。若包含脚本，加载成功后可通过 shell 测试执行，仍需命令授权。</p>
      <p v-if="!localTarget||!agent" class="muted">请选择当前节点中可运行的本地 Agent 后测试。</p>
-     <ToolTest v-if="agent" :key="selected+contextProject+contextGroup+agent+testMode+testScript+current.resolution.enabled" :request="request" :project="contextProject" :group="contextGroup" :scope="scope" :agent="agent" :name="kind==='tool'?name(current.resource):testMode==='read'?'skill_read':'python_run'" :schema="kind==='tool'?content.parameters:undefined" :initial-arguments="kind==='skill'?(testMode==='read'?{skill_id:content.id}:{skill_id:content.id,path:testScript,args:[]}):undefined" :disabled="busy||!canTest||(kind==='skill'&&testMode==='python'&&!testScript)"/>
+     <ToolTest v-if="agent" :key="selected+contextProject+contextGroup+agent+current.resolution.enabled" :request="request" :project="contextProject" :group="contextGroup" :scope="scope" :agent="agent" :name="kind==='tool'?name(current.resource):'find'" :schema="kind==='tool'?content.parameters:undefined" :initial-arguments="kind==='skill'?{target:'skill',id:content.id}:undefined" :disabled="busy||!canTest" @completed="output=>{skillDirectory=output?.skills?.[0]?.directory||''}"/>
+     <template v-if="kind==='skill'&&skillDirectory&&scripts.length&&scope==='business'">
+      <label>执行脚本<el-select v-model="testScript"><el-option v-for="path in scripts" :key="path" :label="path" :value="path" /></el-select></label>
+      <ToolTest v-if="testScript" :key="skillDirectory+testScript" :request="request" :project="contextProject" :group="contextGroup" :scope="scope" :agent="agent" name="shell" :initial-arguments="{command:scriptCommand}" :disabled="busy||!canTest"/>
+     </template>
     </div>
    </template>
    <div v-else class="config-empty"><span>{{kind==='tool'?'⌘':'▤'}}</span><h3>统一能力库</h3><p>创建或导入一次定义，再按项目与 Agent 绑定使用。</p></div>

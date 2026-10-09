@@ -126,7 +126,10 @@ mod tests {
             json!({"message_id":Uuid::new_v4(),"content":"test"}),
         );
         let answer = tokio::time::timeout(
-            Duration::from_secs(5),
+            // Generous on purpose: this exercises a real HTTP roundtrip plus fixture
+            // sleeps, and under a loaded suite (embedded-DB tests run alongside) a
+            // tight budget flakes without signalling a product regression.
+            Duration::from_secs(30),
             run_local(
                 &state,
                 &link,
@@ -361,7 +364,7 @@ pub(super) async fn run_link(state: AppState, mut link: Link) {
                                             )
                                             .await
                                         }
-                                        Err(_) => Err("Carbot busy".into()),
+                                        Err(_) => Err("Crabot busy".into()),
                                     };
                                     let body = match result {
                                         Ok(result) => json!({"id":id,"result":result}),
@@ -452,7 +455,7 @@ async fn enroll(state: &AppState, http: &reqwest::Client, link: &mut Link) -> Re
     {
         json!({"enrollment_token":link.enrollment_token})
     } else {
-        json!({"node_id":state.node_id,"registration_secret":registration["secret"],"name":std::env::var("AGENT_NAME").unwrap_or_else(|_|"Carbot".into())})
+        json!({"node_id":state.node_id,"registration_secret":registration["secret"],"name":std::env::var("AGENT_NAME").unwrap_or_else(|_|"Crabot".into())})
     };
     let response = http
         .post(format!(

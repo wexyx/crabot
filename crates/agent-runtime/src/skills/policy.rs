@@ -3,28 +3,25 @@
 pub struct ExecutionPolicy {
     profile: String,
     allowed_profiles: Vec<String>,
-    allow_python: bool,
 }
 impl ExecutionPolicy {
-    pub fn new(profile: String, allow_python: bool) -> Result<Self, String> {
+    pub fn new(profile: String) -> Result<Self, String> {
         if profile.is_empty() {
             return Err("execution profile required".into());
         }
         Ok(Self {
             allowed_profiles: vec![profile.clone()],
             profile,
-            allow_python,
         })
     }
     pub fn from_env() -> Result<Self, String> {
         let policy = Self::new(
-            std::env::var("CARBOT_EXECUTION_PROFILE")
-                .or_else(|_| std::env::var("CARBOT_SANDBOX_PROFILE"))
+            std::env::var("CRABOT_EXECUTION_PROFILE")
+                .or_else(|_| std::env::var("CRABOT_SANDBOX_PROFILE"))
                 .unwrap_or_else(|_| "default".into()),
-            std::env::var("CARBOT_ALLOW_SKILL_PYTHON").as_deref() == Ok("1"),
         )?;
-        if let Ok(value) = std::env::var("CARBOT_EXECUTION_ALLOWED_PROFILES")
-            .or_else(|_| std::env::var("CARBOT_SANDBOX_ALLOWED_PROFILES"))
+        if let Ok(value) = std::env::var("CRABOT_EXECUTION_ALLOWED_PROFILES")
+            .or_else(|_| std::env::var("CRABOT_SANDBOX_ALLOWED_PROFILES"))
         {
             if !value.trim().is_empty() {
                 return policy.with_allowed_profiles(
@@ -60,9 +57,6 @@ impl ExecutionPolicy {
         }
         Ok(selected.into())
     }
-    pub fn python_enabled(&self) -> bool {
-        self.allow_python
-    }
 }
 
 #[cfg(test)]
@@ -70,13 +64,13 @@ mod tests {
     use super::*;
     #[test]
     fn skill_can_only_select_operator_allowed_profiles() {
-        let policy = ExecutionPolicy::new("offline".into(), false)
+        let policy = ExecutionPolicy::new("offline".into())
             .unwrap()
             .with_allowed_profiles(vec!["offline".into(), "business".into()])
             .unwrap();
         assert_eq!(policy.select_profile(None).unwrap(), "offline");
         assert_eq!(policy.select_profile(Some("business")).unwrap(), "business");
         assert!(policy.select_profile(Some("privileged")).is_err());
-        assert!(ExecutionPolicy::new("".into(), true).is_err());
+        assert!(ExecutionPolicy::new("".into()).is_err());
     }
 }

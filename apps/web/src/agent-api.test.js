@@ -5,7 +5,7 @@ import { createAgentConnection, createSseDecoder, normalizeAgentUrl } from './ag
 test('Policy conflicts preserve the server error for the editor', async () => {
   const connection = createAgentConnection('https://agent.example', 'key', async () =>
     new Response('{"error":"version_conflict"}', {status:409}))
-  await assert.rejects(connection.request('/v1/carbot/control'), /409.*version_conflict/)
+  await assert.rejects(connection.request('/v1/crabot/control'), /409.*version_conflict/)
   connection.close()
 })
 

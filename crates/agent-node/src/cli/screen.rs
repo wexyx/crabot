@@ -34,7 +34,10 @@ impl Screen {
         )
         .lines()
         {
-            write!(out, "{line}\r\n").map_err(|e| e.to_string())?;
+            self.theme
+                .write_banner(&mut out, line)
+                .map_err(|e| e.to_string())?;
+            write!(out, "\r\n").map_err(|e| e.to_string())?;
         }
         out.flush().map_err(|e| e.to_string())
     }
@@ -123,15 +126,15 @@ impl Screen {
                     .take(usize::from(rows).saturating_sub(6)),
             );
         }
-        let status = if secret || editor.suggestions().is_empty() {
-            status.to_owned()
-        } else {
-            editor.suggestions().join("  ")
-        };
-
-        if !status.is_empty() {
+        if !secret && permission.is_none() && !editor.suggestions().is_empty() {
+            lines.extend(editor.menu());
+        } else if !status.is_empty() {
             lines.push(wrap(&status, width).into_iter().next().unwrap_or_default());
         }
+        lines = lines
+            .into_iter()
+            .map(|line| wrap(&line, width).into_iter().next().unwrap_or_default())
+            .collect();
         let (footer_left, footer_right) = super::footer::layout(session_info, update_notice, width);
         let footer = vec![format!("{footer_left}{footer_right}")];
         lines.truncate(usize::from(rows).saturating_sub(input_capacity + footer.len()));

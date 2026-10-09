@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,policy} from './admin-fixture.mjs'
 test('chat rename and soft deletion persist without deleting Agents',async()=>{
- const dir=await mkdtemp(join(tmpdir(),'carbot-chat-menu-'));let server
+ const dir=await mkdtemp(join(tmpdir(),'crabot-chat-menu-'));let server
  try{
   server=await start(dir,{ADMIN_AGENT_PROVIDER:'mock'})
   const p=(await request(server,'/v1/repl')).projects[0].id

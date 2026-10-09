@@ -1,4 +1,4 @@
-# Carbot 使用与配置
+# Crabot 使用与配置
 
 安装和架构见 [README](../README.md)。
 
@@ -15,8 +15,8 @@ Web 使用 Vue 3 + Element Plus。终端与 Web 共享同一应用层、Agent、
 | 模式 | 行为 |
 | --- | --- |
 | 简单聊天 | 有且仅有一个 Agent |
-| A2A | 按轮次让成员共享上下文交流 |
-| PMO | Leader 按成员角色分配任务并汇总 |
+| 讨论模式 | 按职责发言，无关成员让出；有结论且其他成员确认或让出即结束，轮次仅为上限 |
+| Leader 模式 | Leader 按成员角色分配任务并汇总 |
 | 接力 | 按指定顺序、随机或协商优先级选择 Agent；额度不足时交给下一个 |
 
 项目名称可留空，首次消息生成初始标题。列表「⋯」支持重命名和删除。删除采用软删除：从列表移除、禁止继续发送，本地历史日志保留；不删除 Agent。运行中的任务需先停止。
@@ -33,15 +33,19 @@ Web 使用 Vue 3 + Element Plus。终端与 Web 共享同一应用层、Agent、
 
 ### Claude 与 Codex 启动命令
 
-Claude / Codex 的运行器配置支持启动命令，例如 `claude`、`claude --model sonnet`、`codex --model 模型名`，也支持 `"/带空格的路径/claude" --model sonnet`。Web 与 CLI 配置向导均可填写，仍保存在兼容原配置的 `CLAUDE_BIN` / `CODEX_BIN` 字段中。程序按 PATH 查找，参数按引号拆分，不执行 Shell 展开、管道或重定向；流式输出、任务提示词、执行权限和会话参数由 Carbot 添加，请勿重复填写。
+首次启动和 `/agent-config` 使用同一配置向导：运行器、模型厂商、协议通过 ↑/↓ 选择，Enter 确认，Esc 取消。服务地址、模型名、启动命令、API Key 和环境变量仍可自由输入；已有配置会预选当前值。OpenCode 模型目录可用时支持选择模型或切换为手动输入。非交互输入和 `TERM=dumb` 使用编号列表，可填写序号或原始值；密钥不回显、不进入命令历史。
+
+选择外部运行器后，确认启动命令时检查可执行文件及执行权限，支持 PATH 查找和带参数的自定义路径。未安装时显示官方安装说明，停留在当前步骤；可在另一终端安装后重新检测，或填写绝对路径。不会自动执行下载脚本，也不会把“程序存在”视为“已经登录”。安装参考：[Codex](https://learn.chatgpt.com/docs/codex/cli)、[Claude Code](https://code.claude.com/docs/en/setup)、[OpenCode](https://opencode.ai/docs/#install)。
+
+Claude / Codex 的运行器配置支持启动命令，例如 `claude`、`claude --model sonnet`、`codex --model 模型名`，也支持 `"/带空格的路径/claude" --model sonnet`。Web 与 CLI 配置向导均可填写，仍保存在兼容原配置的 `CLAUDE_BIN` / `CODEX_BIN` 字段中。程序按 PATH 查找，参数按引号拆分，不执行 Shell 展开、管道或重定向；流式输出、任务提示词、执行权限和会话参数由 Crabot 添加，请勿重复填写。
 
 ### Agent 环境变量
 
 默认 Agent 和普通本地 Agent 的配置表单都有“环境变量”键值表，支持新增、修改和删除；CLI 配置向导支持填写 JSON，例如 `{"ANTHROPIC_API_KEY":"...","ANTHROPIC_BASE_URL":"https://your-endpoint","LANG":"zh_CN.UTF-8"}`，回车保留、`-` 清空。启动文件也可使用 `AGENT_ENV_JSON`。
 
-变量仅注入当前 Agent 及其工具进程，不修改服务器的全局环境；配置值优先于透传的宿主变量。Carbot 的模型配置也可通过 `MODEL_*` 环境变量覆盖，并支持独立 HTTP/HTTPS 代理。`LANG` 默认跟随启动环境，仅影响子进程区域设置，不限制 Agent 回复语言。
+变量仅注入当前 Agent 及其工具进程，不修改服务器的全局环境；配置值优先于透传的宿主变量。Crabot 的模型配置也可通过 `MODEL_*` 环境变量覆盖，并支持独立 HTTP/HTTPS 代理。`LANG` 默认跟随启动环境，仅影响子进程区域设置，不限制 Agent 回复语言。
 
-值不在配置查询中回显，编辑时未改动的值保留；本地明文保存，请妥善保护实例目录。`HOME`、`TMPDIR`、`CODEX_HOME`、`CARBOT_*`、`AGENT_*` 等运行目录/控制变量由宿主管理，不能通过 Agent 配置覆盖。每个 Agent 最多 64 个变量；值不做 Shell 展开。
+值不在配置查询中回显，编辑时未改动的值保留；本地明文保存，请妥善保护实例目录。`HOME`、`TMPDIR`、`CODEX_HOME`、`CRABOT_*`、`AGENT_*` 等运行目录/控制变量由宿主管理，不能通过 Agent 配置覆盖。每个 Agent 最多 64 个变量；值不做 Shell 展开。
 
 ### Tool 与 Skill
 
@@ -59,8 +63,8 @@ Claude / Codex 的运行器配置支持启动命令，例如 `claude`、`claude 
 
 本地 Agent 支持三档，默认 `ask`，只由 CLI/Web 人工入口修改，不注册为管理 Agent 工具。权限保存在本节点该 Agent 的配置中，作用于该 Agent 的所有项目，不传递给远端 Agent。管理聊天独立保留审批，配置更新只影响后续任务；降低权限不会终止正在运行的任务，必要时先停止生成。
 
-- **请求批准（ask）**：Carbot Shell 命令每次询问。
-- **帮我批准（auto）**：使用当前 Carbot 实例全局命令白名单，默认约 50 条常见只读、目录查询、版本及受限 Git 查询命令。匹配完整命令和参数，支持 `*`（任意字符，含多个参数）和 `?`（单个字符），例如 `git status *`、`cat *.md`。可执行文件名必须明确；仍拒绝管道、重定向及命令替换。宽泛规则可放行脚本和危险参数，请谨慎配置。自定义脚本命令依然可能危险，请自行核对。
+- **请求批准（ask）**：Crabot Shell 命令每次询问。
+- **帮我批准（auto）**：使用当前 Crabot 实例全局命令白名单，默认约 50 条常见只读、目录查询、版本及受限 Git 查询命令。匹配完整命令和参数，支持 `*`（任意字符，含多个参数）和 `?`（单个字符），例如 `git status *`、`cat *.md`。可执行文件名必须明确；仍拒绝管道、重定向及命令替换。宽泛规则可放行脚本和危险参数，请谨慎配置。自定义脚本命令依然可能危险，请自行核对。
 - **完全访问（full）**：明确确认后取消执行确认，可访问宿主当前用户有权限的文件和网络，包括目录外及凭据。仍不提供系统管理员权限，不自动启用被禁用的 Tool/Skill/Python。仅用于可信任务。
 
 Web 在单本地 Agent 项目输入区域切换，完全访问有独立风险确认框。CLI：
@@ -80,7 +84,7 @@ Web 在单本地 Agent 项目输入区域切换，完全访问有独立风险确
 
 普通读写 HTTP 接口：`GET/PUT /v1/repl/{project}/agents/{id}/permissions`；写入需 `mode`、`expected_version`，full 另需 `confirm_full_access:true`。沿用本机管理接口的信任边界，请勿对不可信本地程序开放管理端口；变更有审计记录。普通 Agent 配置保存不能注入权限字段。
 
-**原生运行器边界**：Codex/Claude 非交互命令的逐工具授权协议尚未转接。ask/auto 下分别保留 Codex read-only / Claude plan，需执行命令时走 Carbot 注册工具及审批；不能转接的原生操作会拒绝，不会默认批准。full 下使用 Codex danger-full-access / Claude bypassPermissions。所有模式均不再套 Carbot 外层系统沙箱。此设置不解决模型账号登录认证问题。
+**原生运行器边界**：Codex/Claude 非交互命令的逐工具授权协议尚未转接。ask/auto 下分别保留 Codex read-only / Claude plan，需执行命令时走 Crabot 注册工具及审批；不能转接的原生操作会拒绝，不会默认批准。full 下使用 Codex danger-full-access / Claude bypassPermissions。所有模式均不再套 Crabot 外层系统沙箱。此设置不解决模型账号登录认证问题。
 
 授权与命令结果在 Web 输入框上方展示；默认只展示操作描述和目标，完整命令可展开核对。白名单在「管理 → 权限白名单」独立页面维护，GET/PUT /v1/permissions/allowlist，写入包含 command_allowlist 字符串数组和 expected_version。所有本地 Agent 共用，配置持久化并记录审计，不提供给模型自我修改。
 
@@ -88,24 +92,23 @@ Web 在单本地 Agent 项目输入区域切换，完全访问有独立风险确
 
 Python 和命令执行保留文件系统沙箱，网络固定使用宿主网络，旧执行 profile 的 network:none 不再用于它们；常见 HTTP(S)/ALL/NO_PROXY 环境变量会透传。工作目录不是副本，修改直接落在本机文件上。原生 Codex/Claude 的运行限制仍遵循各自权限模式。
 
-Agent 可配置回复要求（默认简洁、结论先行），作为每次调用的 Agent 提示词，不是硬性字数截断。群聊按 Agent 与 invocation 分开发言，工具事件不再作为回答文本输出；原有日志保持不变。日志文件可在「本地存储 · 排查信息」点击打开右侧抽屉，按 128 KB 分段读取，支持格式化 / JSONL 原文。
+Agent 可配置回复要求（默认简洁、结论先行），作为每次调用的 Agent 提示词，不是硬性字数截断。群聊按 Agent 与 invocation 分开发言，工具事件不再作为回答文本输出；原有记录保持不变。
 
 组网仅对已有明确 Web 地址提供跳转，不猜测下游来源端口，不提供手动管理地址设置。当前无认证管理接口仍只允许 loopback；跨机管理需本地转发或后续受认证的代理机制。
 
 ### 上下文与压缩
 
-Web 聊天右上角「新上下文」与 CLI `/new` 使用同一分界机制：保留项目成员、策略和全部原始 JSONL 日志，但后续请求不再携带分界前的聊天内容。管理聊天也支持；执行中需先停止或等待。分界持久化，重启后仍生效。`/history` 仍只展示历史，不撤销分界。
+Web 聊天右上角「新上下文」与 CLI `/new` 使用同一分界机制：保留项目成员、策略和全部原始记录，但后续请求不再携带分界前的聊天内容。管理聊天也支持；执行中需先停止或等待。分界持久化，重启后仍生效。`/history` 仍只展示历史，不撤销分界。
 
-每次默认只携带最近 8 轮人类对话，排除已完成回答的流式碎片和原始工具输出。更早记录不删除，通过 `history_read` 按需读取；实例的 `CONTEXT_RECENT_TURNS` 可设置为 1–100。读取最近日志从文件尾部向前定位，不再扫描全部旧记录。
+每个 Agent 的上下文独立构建：最后一次摘要＋摘要覆盖序号后的全部聊天记录，没有摘要则读取重置点后的记录。各 Agent 按自己的上下文长度触发压缩；不再统一截取最近 N 轮。`compact` 触发宿主生成摘要并保存到索引；`find(target=history)` 和 `find(target=history)` 可回查原始内容。
 
-管理与项目共用 `history_read`：
-- `action=read`：列出当前会话日志，或按文件名与行号读取。
-- `action=compact, strategy=summary, summary=...`：Agent 自行总结并提交需要保留的决策、约束、进度与历史引用。
-- `action=compact, strategy=recent`：仅保留原始任务与最新完整工具轮次，较早工具过程按需回查。
+管理与项目共用 `compact`（通过 `find(target=tool, query=compact)` 解锁；只做上下文管理，不读日志）：
+- 不带参数或 `strategy=summary, summary=...`：Agent 自行总结并提交需要保留的决策、约束、进度与历史引用。
+- `strategy=recent`：仅保留原始任务与最新完整工具轮次，较早工具过程按需用 `find` 回查。
 
 Agent 配置中不再提供压缩策略选项。压缩在完整工具轮次结束后应用，原始任务、系统规则、当前工具调用与结果保持完整，原始日志不覆盖；模型需要更多细节时再次调用同一工具。
 
-Carbot Harness 仍保留 `CONTEXT_MAX_TOKENS` 长度上限（默认 65536），包含工具定义并预留输出空间。超限时宿主执行本地有损摘录或明确报错，不依赖模型自行发现溢出，不额外请求模型生成摘要。Codex/Claude 自身的上下文上限仍由各自 CLI 管理。
+Crabot Harness 仍保留 `CONTEXT_MAX_TOKENS` 长度上限（默认 65536），包含工具定义并预留输出空间。超限时宿主执行本地有损摘录或明确报错，不依赖模型自行发现溢出，不额外请求模型生成摘要。Codex/Claude 自身的上下文上限仍由各自 CLI 管理。
 
 ### CLI 常用操作
 
@@ -131,11 +134,15 @@ Carbot Harness 仍保留 `CONTEXT_MAX_TOKENS` 长度上限（默认 65536），�
 /exit                       退出
 ```
 
-CLI 启动不自动打印历史，使用 `/history` 恢复。鼠标保留终端滚动与拖选复制，↑/↓ 和 PgUp/PgDn 切换输入历史，Tab 补全命令。Ctrl+C 优先中断任务或清空输入；管理会话空闲、输入为空时返回上一个聊天。Ctrl+D 退出。
+CLI 启动不自动打印历史，使用 `/history` 恢复。`/chat`（或 `/sessions`）打开聊天选择器，第一项是「＋ 新建聊天」，下面是已有聊天。↑/↓ 选择，Enter 进入，Esc 取消；新建会创建使用默认 Agent 的独立简单聊天。管道模式按编号选择，`/cancel` 取消。`/chat ID或名称` 保留为快捷入口，支持唯一 ID 前缀；重名或前缀重复时请填写完整 ID。`/history ID或名称` 进入并恢复记录，`/new` 只重置当前上下文，不删除聊天。`/manage` 进入管理，`/back` 返回。
+
+输入 `/` 打开带说明的命令菜单，继续输入可筛选，↑/↓ 或 PgUp/PgDn 选择，Tab 补全；Enter 对不完整命令先补全，再按一次执行。没有命令菜单时方向键切换输入历史。鼠标保留终端原生滚动、拖选复制。Ctrl+C 优先中断任务或清空输入；管理会话空闲、输入为空时返回上一个聊天。Ctrl+P 仍用于审批，Ctrl+D 退出。
+
+`/agents` 始终查看全部 Agent，`/members` 查看当前项目成员。`/project` 保留创建和配置功能，`/agent` 保留增删改查及测试。`/help commands` 列出全部主要命令；复杂配置可使用 Web 或管理对话。旧别名 `/admin`、`/admin-config` 仍可使用，但不在默认菜单重复展示；旧存储空间命令 `/namespace` 已移除，用 `/chat` 或 `/manage` 替代。
 
 ## 去中心化组网
 
-每个节点既能提供 Agent，也能主动连接上游。下游主动建立 HTTP + SSE 长连接，因此不需要暴露本地公网端口。不同局域网可共同挂载一个公网 Carbot / ProxyAgent。
+每个节点既能提供 Agent，也能主动连接上游。下游主动建立 HTTP + SSE 长连接，因此不需要暴露本地公网端口。不同局域网可共同挂载一个公网 Crabot / ProxyAgent。
 
 连接需本机确认授权；自动注册取得 AK/SK，凭据保存于各自节点。上游可发现、调用后代能力及管理授权范围内的子群策略，不能修改远端 Agent 定义。节点不能借此向上访问父节点或兄弟节点的数据。
 
@@ -148,7 +155,7 @@ CLI 启动不自动打印历史，使用 `/history` 恢复。鼠标保留终端�
 
 ## 数据、安全与配置
 
-配置、凭据、策略使用本地状态文件；聊天按 session / 群组 ID，以小时分片的 JSONL 逐行追加，不整份聊天重写。目录锁防止多进程写同一个实例。备份前停止实例，再备份完整数据目录。
+配置、凭据、策略使用本地状态文件；聊天记录写入按项目隔离的知识索引（LadybugDB），不再写入 JSONL 日志文件。目录锁防止多进程写同一个实例。备份前停止实例，再备份完整数据目录。
 
 `default-agent.json` 保存默认运行器/模型配置；密钥本地明文保存，Unix 文件权限为 0600。不要提交、公开或同步活动实例目录。
 
@@ -156,18 +163,18 @@ CLI 启动不自动打印历史，使用 `/history` 恢复。鼠标保留终端�
 
 项目可覆盖工作目录和文件工具的目录外访问策略（deny / ask），不能扩大宿主配置允许的文件工具权限。Shell/Python 在工作目录直接运行，具备当前系统用户的文件和网络权限；cwd 不是安全边界。操作确认与命令白名单仍然有效。
 
-模型环境变量：`MODEL_PROVIDER`、`MODEL_NAME`、`MODEL_API_KEY`、`MODEL_BASE_URL`、`MODEL_API`。显式环境变量在重启时优先于保存配置。源码和安装版统一读取 `<实例目录>/.agent.env`（默认 `~/.carbot/.agent.env`）；若运行目录存在 `.agent.env`，其同名配置覆盖实例文件。启动参数优先于显式环境变量，显式环境变量优先于文件。配置文件仅支持字面量 `KEY=value`，不执行 Shell 或变量替换；相对目录基于配置文件所在目录。`--name` / `--data-dir` 先选择实例，再读取配置；实例文件不能通过 `CARBOT_DATA_DIR` 重定向自身。运行目录配置中的 `CARBOT_DATA_DIR` 可以选择实例，仍受显式参数/环境变量覆盖。交互保存的模型配置 `default-agent.json` 优先于文件中的模型默认值，避免旧模板覆盖已保存的配置。
+模型环境变量：`MODEL_PROVIDER`、`MODEL_NAME`、`MODEL_API_KEY`、`MODEL_BASE_URL`、`MODEL_API`、`MODEL_SYSTEM_PROMPT`。`MODEL_SYSTEM_PROMPT` 留空使用实例 `conf/agent.md` 覆盖；没有覆盖则使用当前版本默认模板。CLI 初始化只读取和校验，不复制文件，可通过 Web「管理 → 系统提示词」、`/prompts` 或同名文本文件覆盖；恢复默认会删除覆盖，详见[系统提示词](system-prompts.md)。显式环境变量在重启时优先于保存配置。源码和安装版统一读取 `<实例目录>/.agent.env`（默认 `~/.crabot/.agent.env`）；若运行目录存在 `.agent.env`，其同名配置覆盖实例文件。启动参数优先于显式环境变量，显式环境变量优先于文件。配置文件仅支持字面量 `KEY=value`，不执行 Shell 或变量替换；相对目录基于配置文件所在目录。`--name` / `--data-dir` 先选择实例，再读取配置；实例文件不能通过 `CRABOT_DATA_DIR` 重定向自身。运行目录配置中的 `CRABOT_DATA_DIR` 可以选择实例，仍受显式参数/环境变量覆盖。交互保存的模型配置 `default-agent.json` 优先于文件中的模型默认值，避免旧模板覆盖已保存的配置。
 
 ### 本地持久化与内置 Skill
 
-聊天记录写入按小时分片的 JSONL；实例状态写入 `state.jsonl`，一行对应一次事务，仅包含变化的记录，不再在每次操作时重写整份 `state.json`。启动时回放日志，兼容旧 `state.json` 基线；旧文件请保留，不能单独删除。JSONL 中间损坏会拒绝启动，崩溃留下的未完成末行会恢复到最后一次完整提交。日志尚不自动压缩归档，文件会随使用增长。
+聊天记录写入按项目隔离的知识索引（`<数据目录>/knowledge/<project>/graph.db`），每条事件带序号与完整 payload，摘要节点按 `(chat, agent)` 隔离并标记其覆盖的记录；实例状态仍写入 `state.jsonl`，一行对应一次事务，仅包含变化的记录，不再在每次操作时重写整份 `state.json`。启动时回放日志，兼容旧 `state.json` 基线；旧文件请保留，不能单独删除。JSONL 中间损坏会拒绝启动，崩溃留下的未完成末行会恢复到最后一次完整提交。旧版本遗留的 `chats/` JSONL 目录不再读写，可自行清理。
 
-内置 Skill 源码在 `skills/system/{business,management}/<skill>/`，每个目录包含 `SKILL.md`、`skill.json`（描述和默认启用状态），可附带 `scripts/`、`references/`。`scripts/package-release.sh` 自动将其放入发布包 `skills/system`；`install.sh` 随程序复制到版本目录，启动器通过 `CARBOT_SYSTEM_SKILLS_DIR` 定位。也可显式指定这个环境变量覆盖来源。
+内置 Skill 源码在 `skills/system/{business,management}/<skill>/`，每个目录包含 `SKILL.md`、`skill.json`（描述和默认启用状态），可附带 `scripts/`、`references/`。`scripts/package-release.sh` 自动将其放入发布包 `skills/system`；`install.sh` 随程序复制到版本目录，启动器通过 `CRABOT_SYSTEM_SKILLS_DIR` 定位。也可显式指定这个环境变量覆盖来源。
 
-系统 Skill 在工具库中只读，可通过已有生效范围规则启用/禁用；安装升级不写入用户 Skill 或实例数据。内置依赖安装、浏览器自动化、OCR Skill 只提供按需工作流，不会在安装 Carbot 时自动安装 Homebrew、浏览器或 Tesseract，也不会绕过执行确认。
+系统 Skill 在工具库中只读，可通过已有生效范围规则启用/禁用；安装升级不写入用户 Skill 或实例数据。内置依赖安装、浏览器自动化、OCR Skill 只提供按需工作流，不会在安装 Crabot 时自动安装 Homebrew、浏览器或 Tesseract，也不会绕过执行确认。
 
-新建或上传的 Skill 保存在当前实例的 `skills/user/` 下：默认是 `~/.carbot/skills/user/`，命名实例是 `~/.carbot_<别名>/skills/user/`；使用 `--data-dir` 时跟随指定的数据目录。项目与管理 Skill 分别放在 `business/`、`management/` 中，正文 `SKILL.md` 和脚本、参考资料都以独立文件保存。内置 Skill 仍留在发布包目录，不会复制到实例目录。
+新建或上传的 Skill 保存在当前实例的 `skills/user/` 下：默认是 `~/.crabot/skills/user/`，命名实例是 `~/.crabot_<别名>/skills/user/`；使用 `--data-dir` 时跟随指定的数据目录。项目与管理 Skill 分别放在 `business/`、`management/` 中，正文 `SKILL.md` 和脚本、参考资料都以独立文件保存。内置 Skill 仍留在发布包目录，不会复制到实例目录。
 
-Skill 的运行依赖与源码分开保存。浏览器依赖统一位于 `<实例数据目录>/runtime/browser-automation/.runtime/`，`browser_run`、`install.mjs` 和 `browser.mjs` 共用该目录。已有依赖跨重启和升级复用；Puppeteer 或匹配的浏览器缺失时自动进入构建流程，仍遵循当前执行授权。不会搜索或修改旧 release、源码仓库或 `~/.browser-skill` 中的依赖；Node.js 与 npm 需提前安装。
+Skill 的运行依赖与源码分开保存。浏览器依赖统一位于 `<实例数据目录>/runtime/browser-automation/.runtime/`，`install.mjs` 和 `browser.mjs` 共用该目录。已有依赖跨重启和升级复用；Puppeteer 或匹配的浏览器缺失时自动进入构建流程，仍遵循当前执行授权。不会搜索或修改旧 release、源码仓库或 `~/.browser-skill` 中的依赖；Node.js 与 npm 需提前安装。
 
 每个用户 Skill 按“名称与标识 / 保存版本”分目录，保存后在状态日志中记录当前目录引用，不再把正文与脚本写入该条日志。这样保存失败不会覆盖上一版；旧版本文件保留用于恢复，删除 Skill 后不会继续加载它。推荐通过 Web 编辑，直接修改当前版本的文件也会在下次加载 Skill 时生效。旧版已存于日志的自建 Skill 仍兼容读取，下次保存时会写入实例目录。

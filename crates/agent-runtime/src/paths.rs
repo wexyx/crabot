@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-/// Resolve defaults independently of the directory used to launch Carbot.
+/// Resolve defaults independently of the directory used to launch Crabot.
 pub fn user_home() -> PathBuf {
     std::env::home_dir()
         .filter(|path| path.is_absolute())
@@ -8,10 +8,10 @@ pub fn user_home() -> PathBuf {
 }
 
 pub fn data_dir() -> PathBuf {
-    std::env::var_os("CARBOT_DATA_DIR")
+    std::env::var_os("CRABOT_DATA_DIR")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .unwrap_or_else(|| user_home().join(".carbot"))
+        .unwrap_or_else(|| user_home().join(".crabot"))
 }
 
 pub fn workdir() -> PathBuf {

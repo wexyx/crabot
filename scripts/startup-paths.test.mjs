@@ -9,11 +9,11 @@ import {pause,stop} from './admin-fixture.mjs'
 
 const binary=resolve('target/debug/agent-node')
 test('startup paths use home, preserve overrides and lock the shared instance',{timeout:30000},async()=>{
-  const temp=await realpath(await mkdtemp(join(tmpdir(),'carbot-paths-')))
+  const temp=await realpath(await mkdtemp(join(tmpdir(),'crabot-paths-')))
   const home=join(temp,'home'),cwd=join(temp,'launch'),work=join(temp,'work')
   await Promise.all([home,cwd,work].map(p=>mkdir(p)))
   const base={...process.env,HOME:home,USERPROFILE:home,ADMIN_AGENT_PROVIDER:'mock',BIND_ADDR:'127.0.0.1:0',NODE_LINKS_JSON:'[]'}
-  delete base.CARBOT_DATA_DIR;delete base.AGENT_WORKDIR
+  delete base.CRABOT_DATA_DIR;delete base.AGENT_WORKDIR
   async function launch(args=[],overrides={},directory=cwd){
     const child=spawn(binary,args,{cwd:directory,env:{...base,...overrides},stdio:['ignore','pipe','pipe']})
     let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b)
@@ -28,11 +28,11 @@ test('startup paths use home, preserve overrides and lock the shared instance',{
   let server
   try{
     for(const [args,env,data,root] of [
-      [[],{},join(home,'.carbot'),home],
-      [['--name','dev','--workdir',work],{},join(home,'.carbot_dev'),work],
-      [[],{CARBOT_DATA_DIR:join(temp,'env-data'),AGENT_WORKDIR:work},join(temp,'env-data'),work],
-      [['--data-dir',join(temp,'cli-data'),'--workdir',home],{CARBOT_DATA_DIR:join(temp,'ignored'),AGENT_WORKDIR:work},join(temp,'cli-data'),home],
-      [['--name','named'],{CARBOT_DATA_DIR:join(temp,'ignored')},join(home,'.carbot_named'),home],
+      [[],{},join(home,'.crabot'),home],
+      [['--name','dev','--workdir',work],{},join(home,'.crabot_dev'),work],
+      [[],{CRABOT_DATA_DIR:join(temp,'env-data'),AGENT_WORKDIR:work},join(temp,'env-data'),work],
+      [['--data-dir',join(temp,'cli-data'),'--workdir',home],{CRABOT_DATA_DIR:join(temp,'ignored'),AGENT_WORKDIR:work},join(temp,'cli-data'),home],
+      [['--name','named'],{CRABOT_DATA_DIR:join(temp,'ignored')},join(home,'.crabot_named'),home],
     ]){
       server=await launch(args,env)
       assert.ok(server.output.includes('Local data: '+data),server.output)
@@ -41,7 +41,7 @@ test('startup paths use home, preserve overrides and lock the shared instance',{
       await stop(server);server=null
     }
     // Instance defaults, launch-directory override, explicit environment and CLI priority.
-    await writeFile(join(home,'.carbot','.agent.env'), 'AGENT_WORKDIR='+work+'\n')
+    await writeFile(join(home,'.crabot','.agent.env'), 'AGENT_WORKDIR='+work+'\n')
     server=await launch()
     assert.equal((await fetch(server.url+'/v1/workspace').then(r=>r.json())).workdir,work)
     await stop(server)
@@ -55,7 +55,7 @@ test('startup paths use home, preserve overrides and lock the shared instance',{
     server=await launch(['--workdir',home], {AGENT_WORKDIR:work})
     assert.equal((await fetch(server.url+'/v1/workspace').then(r=>r.json())).workdir,home)
     await stop(server)
-    await writeFile(join(home,'.carbot_dev','.agent.env'),'AGENT_WORKDIR='+work+'\n')
+    await writeFile(join(home,'.crabot_dev','.agent.env'),'AGENT_WORKDIR='+work+'\n')
     server=await launch(['--name','dev'],{},work)
     assert.equal((await fetch(server.url+'/v1/workspace').then(r=>r.json())).workdir,work)
     await stop(server)

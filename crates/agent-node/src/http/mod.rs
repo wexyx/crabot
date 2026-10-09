@@ -3,7 +3,7 @@ pub(crate) mod admin_configuration;
 pub(crate) mod assets;
 pub(crate) mod auth;
 mod capabilities;
-pub(crate) mod chat_logs;
+pub(crate) mod chat_history;
 pub(crate) mod events;
 pub(crate) mod local_access;
 pub(crate) mod repl;
@@ -24,3 +24,4 @@ mod opencode;
 
 mod attachments;
 mod command_allowlist;
+mod system_prompts;

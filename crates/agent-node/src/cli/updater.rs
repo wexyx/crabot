@@ -37,7 +37,7 @@ fn installation(exe: &Path) -> Result<(PathBuf, Option<PathBuf>), String> {
             && releases
                 .parent()
                 .and_then(Path::file_name)
-                .is_some_and(|v| v == "carbot")
+                .is_some_and(|v| v == "crabot")
             && releases
                 .parent()
                 .and_then(Path::parent)
@@ -79,7 +79,7 @@ pub(super) async fn install() -> Result<String, String> {
     state().send_replace("正在下载更新…".into());
     let result = install_inner().await;
     state().send_replace(if result.is_ok() {
-        "更新已安装 · 请重启 Carbot".into()
+        "更新已安装 · 请重启 Crabot".into()
     } else {
         "更新失败 · /update 重试".into()
     });
@@ -93,11 +93,11 @@ async fn run_installer(script: PathBuf, prefix: Option<PathBuf>) -> Result<Strin
     let mut command = Command::new("bash");
     command
         .arg(script)
-        .env("CARBOT_VERSION", "latest")
+        .env("CRABOT_VERSION", "latest")
         .stdin(std::process::Stdio::null())
         .kill_on_drop(true);
     if let Some(prefix) = prefix {
-        command.env("CARBOT_INSTALL_PREFIX", prefix);
+        command.env("CRABOT_INSTALL_PREFIX", prefix);
     }
     #[cfg(unix)]
     command.process_group(0);
@@ -112,7 +112,7 @@ async fn run_installer(script: PathBuf, prefix: Option<PathBuf>) -> Result<Strin
             "更新失败，当前版本与会话保持不变；请检查网络或 Release 安装包后 /update 重试。".into(),
         );
     }
-    Ok("更新已安装。配置和聊天记录已保留；请退出后重启 Carbot 使用新版本。".into())
+    Ok("更新已安装。配置和聊天记录已保留；请退出后重启 Crabot 使用新版本。".into())
 }
 
 #[cfg(test)]
@@ -122,10 +122,10 @@ mod tests {
     async fn installed_updater_uses_its_own_prefix_and_latest_without_exiting() {
         let dir = tempfile::tempdir().unwrap();
         let prefix = dir.path().join("custom prefix");
-        let libexec = prefix.join("share/carbot/releases/v1.0.0-test/libexec");
+        let libexec = prefix.join("share/crabot/releases/v1.0.0-test/libexec");
         std::fs::create_dir_all(&libexec).unwrap();
         let script = libexec.join("install.sh");
-        std::fs::write(&script, "test \"$CARBOT_VERSION\" = latest && test -d \"$CARBOT_INSTALL_PREFIX/share/carbot/releases\"").unwrap();
+        std::fs::write(&script, "test \"$CRABOT_VERSION\" = latest && test -d \"$CRABOT_INSTALL_PREFIX/share/crabot/releases\"").unwrap();
         let (found, target) = installation(&libexec.join("agent-node")).unwrap();
         assert_eq!(target.as_deref(), Some(prefix.as_path()));
         assert!(run_installer(found, target).await.unwrap().contains("重启"));

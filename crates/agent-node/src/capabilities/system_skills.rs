@@ -8,7 +8,7 @@ use std::{
 };
 
 fn directory() -> PathBuf {
-    std::env::var_os("CARBOT_SYSTEM_SKILLS_DIR")
+    std::env::var_os("CRABOT_SYSTEM_SKILLS_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             let bundled = std::env::current_exe()
@@ -157,7 +157,7 @@ mod tests {
     fn repository_skills_load_as_readonly_and_never_grant_python() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../skills/system");
         let rows = read(&root, "business").unwrap();
-        assert_eq!(rows.len(), 3);
+        assert_eq!(rows.len(), 5);
         for row in rows {
             assert!(row.readonly);
             assert_eq!(row.definition["allow_python"], false);

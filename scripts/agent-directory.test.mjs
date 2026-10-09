@@ -4,8 +4,8 @@ import {mkdtemp,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {start,stop,request,history,pause,policy} from './admin-fixture.mjs'
-test('managed Agents, single chat, virtual composition, auto titles and remote Carbot roundtrip',async()=>{
- const dirs=await Promise.all([mkdtemp(join(tmpdir(),'carbot-directory-a-')),mkdtemp(join(tmpdir(),'carbot-directory-b-'))])
+test('managed Agents, single chat, virtual composition, auto titles and remote Crabot roundtrip',async()=>{
+ const dirs=await Promise.all([mkdtemp(join(tmpdir(),'crabot-directory-a-')),mkdtemp(join(tmpdir(),'crabot-directory-b-'))])
  let a,b
  try{
   a=await start(dirs[0],{ADMIN_AGENT_PROVIDER:'mock'});b=await start(dirs[1],{ADMIN_AGENT_PROVIDER:'mock'})

@@ -20,7 +20,22 @@ pub(super) async fn ensure(manager: &Manager, project: Uuid) -> Result<String, S
             }
         }
     }
-    let default = state
+    let id = create(manager, project).await?;
+    state
+        .store
+        .transaction(|data| {
+            data.set("cli_defaults", &key, json!({"group":id}));
+            Ok(())
+        })
+        .await?;
+    Ok(id)
+}
+
+/// A fresh simple chat; unlike ensure, this never reuses the startup project.
+pub(super) async fn create(manager: &Manager, project: Uuid) -> Result<String, String> {
+    let default = manager
+        .core()
+        .state()
         .store
         .get("local_agents", &format!("{project}:default"))
         .await;
@@ -36,12 +51,5 @@ pub(super) async fn ensure(manager: &Manager, project: Uuid) -> Result<String, S
         .as_str()
         .ok_or("default chat missing key")?
         .to_owned();
-    state
-        .store
-        .transaction(|data| {
-            data.set("cli_defaults", &key, json!({"group":id}));
-            Ok(())
-        })
-        .await?;
     Ok(id)
 }
