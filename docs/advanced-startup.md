@@ -4,7 +4,7 @@
 
 ## 系统要求
 
-支持 macOS Apple Silicon / Intel、Linux x86_64 / ARM64。Linux 包基于 Ubuntu 22.04 构建，需要兼容 glibc 和 OpenSSL 3；Alpine/musl 与 Windows 暂无对应安装包。
+支持 macOS Apple Silicon / Intel、Linux x86_64 / ARM64。Linux 包基于 Ubuntu 22.04 和 GCC 13 构建，需要兼容 glibc、GCC 13 的 libstdc++ 运行库和 OpenSSL 3；仅有 Ubuntu 22.04 默认旧版 libstdc++ 的环境可能需要先更新运行库。Alpine/musl 与 Windows 暂无对应安装包。
 
 Crabot 的本机执行不依赖额外隔离组件。Python、Codex、Claude CLI 按需另行安装；使用对应 CLI 助手前，需要完成其账号认证。
 

@@ -8,21 +8,42 @@ jobs:
   build:
     env:
       CRABOT_RELEASE_VERSION: ${{ github.ref_name }}
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            cc: gcc-13
+            cxx: g++-13
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
+            cc: gcc-13
+            cxx: g++-13
           - os: macos-14
             target: aarch64-apple-darwin
+            cc: clang
+            cxx: clang++
           - os: macos-15-intel
             target: x86_64-apple-darwin
+            cc: clang
+            cxx: clang++
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux C++20 toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install --yes gcc-13 g++-13
+      - name: Verify C++20 standard library
+        run: |
+          "$CXX" --version
+          "$CXX" -std=c++20 scripts/ci/cxx20-probe.cpp -o "$RUNNER_TEMP/crabot-cxx20-probe"
+          "$RUNNER_TEMP/crabot-cxx20-probe"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

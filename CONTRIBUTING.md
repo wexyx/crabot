@@ -23,6 +23,8 @@ Rust 的 `mod.rs` / `lib.rs` 只负责模块声明和导出；接口、实现、
 
 仅源码开发需要 Rust（支持 edition 2024）、Node.js 20+ 和 pnpm：
 
+LadybugDB 的本地绑定还需要支持 C++20 `<format>` 的工具链。Linux 使用 GCC/G++ 13 或更新版本，并通过 `CC=gcc-13 CXX=g++-13` 选择编译器；Ubuntu 22.04 默认 GCC 11 不满足要求。Release 工作流在 Ubuntu 22.04 上从 `ubuntu-toolchain-r/test` PPA 安装 GCC/G++ 13，先编译并执行 `scripts/ci/cxx20-probe.cpp` 再构建 Rust。macOS 使用 Xcode Command Line Tools 的 Clang/libc++。
+
 ```bash
 git clone https://github.com/wexyx/crabot.git
 cd crabot
