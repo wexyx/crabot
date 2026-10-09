@@ -12,6 +12,7 @@ mod tools;
 pub(crate) use service::Manager;
 mod capability_library;
 mod catalog;
+mod process_sessions;
 #[cfg(all(test, unix))]
 mod provider_tests;
 mod server_control;
@@ -25,3 +26,4 @@ mod tool_testing;
 mod workbench;
 
 mod context_reset;
+mod documents;

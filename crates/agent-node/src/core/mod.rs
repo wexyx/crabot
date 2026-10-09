@@ -53,3 +53,4 @@ mod command_allowlist;
 pub(crate) mod indexed_history;
 pub(crate) mod recent_context;
 mod response_instructions;
+pub(crate) mod steering;

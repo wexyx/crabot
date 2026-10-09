@@ -20,6 +20,10 @@ pub(crate) async fn run(manager: Arc<Manager>) -> Result<(), String> {
     println!("{}", super::banner::text(address.as_deref(), 80));
     let mut lines = tokio::io::BufReader::new(tokio::io::stdin()).lines();
     loop {
+        if controller.private_input() && std::io::stdin().is_terminal() {
+            controller.cancel_process_input();
+            eprintln!("此终端无法安全隐藏输入，请使用 Web 进程面板或正常交互终端。");
+        }
         print!("{}> ", controller.label());
         std::io::stdout().flush().map_err(|e| e.to_string())?;
         let line = tokio::select! {
@@ -29,7 +33,7 @@ pub(crate) async fn run(manager: Arc<Manager>) -> Result<(), String> {
         let Some(line) = line else {
             break;
         };
-        if line.trim().is_empty() && !controller.choosing_chat() {
+        if line.trim().is_empty() && !controller.choosing_chat() && !controller.private_input() {
             continue;
         }
         match controller.execute(&line).await {

@@ -19,7 +19,7 @@ async fn compaction_removes_native_tool_pairs_together_for_every_protocol() {
             base: "http://127.0.0.1/v1".into(),
             key: "fixture".into(),
             model: "fixture".into(),
-            max_tokens: 1024,
+            max_tokens: Some(1024),
             deepseek_effort: None,
             root: ".".into(),
         })

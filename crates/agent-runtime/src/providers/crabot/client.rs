@@ -8,11 +8,11 @@ use crate::{RuntimeEvent, context::SummaryPlan, tools::ToolRegistry};
 use agent_protocol::SseDecoder;
 use futures_util::StreamExt;
 use serde_json::Value;
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 pub(super) struct ModelClient {
     http: reqwest::Client,
     config: HarnessConfig,
-    protocol: Box<dyn ModelProtocol>,
+    protocol: Arc<dyn ModelProtocol>,
 }
 
 #[cfg(test)]
@@ -66,12 +66,12 @@ impl ModelClient {
         }
         Ok(Self {
             http: self.http.clone(),
-            protocol: ProtocolFactory::create(config.api),
+            protocol: self.protocol.clone(),
             config,
         })
     }
     pub(super) fn new(config: HarnessConfig) -> Result<Self, String> {
-        let protocol = ProtocolFactory::create(config.api);
+        let protocol = ProtocolFactory::create(config.api).into();
         let mut builder = reqwest::Client::builder().timeout(Duration::from_secs(180));
         if [
             "HTTP_PROXY",
@@ -124,7 +124,7 @@ impl ModelClient {
     ) -> Result<(), String> {
         let image_reserve =
             crate::attachments::PreparedAttachments::images(|images| images.len() * 8192);
-        let limit = self.config.context.input_limit(self.config.max_tokens)?.checked_sub(image_reserve).ok_or("CONTEXT_LIMIT: images exceed context length; attach fewer images or increase context length")?;
+        let limit = self.config.input_limit()?.checked_sub(image_reserve).ok_or("CONTEXT_LIMIT: images exceed context length; attach fewer images or increase context length")?;
         let size = |rows: &[Value]| -> Result<usize, String> {
             let request = self
                 .protocol
@@ -153,7 +153,7 @@ impl ModelClient {
             events(RuntimeEvent::ContextCheckpoint {
                 content: "正在智能压缩上下文…".into(),
             });
-            let summary = self.summarize(&plan, limit).await?;
+            let summary = self.summarize(&plan, limit, events).await?;
             let candidate = plan.finish(&summary, &sources);
             let after = size(&candidate)?;
             if after > limit {
@@ -191,7 +191,7 @@ impl ModelClient {
     /// compaction path. The budget mirrors the input-limit path, so the summary
     /// always fits this run's own context length.
     pub(super) async fn compact(&self, history: &[Value]) -> Result<String, String> {
-        let limit = self.config.context.input_limit(self.config.max_tokens)?;
+        let limit = self.config.input_limit()?;
         let size = |rows: &[Value]| -> Result<usize, String> {
             let request = self
                 .protocol
@@ -210,7 +210,7 @@ impl ModelClient {
         let sources = crate::context::HistoryAccess::manifest();
         let plan =
             crate::context::SummaryPlan::new(history, available.saturating_sub(sources.len()))?;
-        let summary = self.summarize(&plan, limit).await?;
+        let summary = self.summarize(&plan, limit, &mut |_| {}).await?;
         Ok(plan.archive(&summary))
     }
 
@@ -223,6 +223,7 @@ impl ModelClient {
         &self,
         plan: &SummaryPlan,
         limit: usize,
+        events: &mut (impl FnMut(RuntimeEvent) + Send),
     ) -> Result<String, String> {
         let size = |rows: &[Value]| -> Result<usize, String> {
             let request = self
@@ -244,7 +245,7 @@ impl ModelClient {
                 let input = vec![serde_json::json!(
                     {"role":"user","content":plan.summary_request(&summary,chunk)}
                 )];
-                if size(&input)? <= limit {
+                if size(&input)?.saturating_add(512) <= limit {
                     break (chunk, input);
                 }
                 if chunk_limit <= 256 {
@@ -252,13 +253,54 @@ impl ModelClient {
                 }
                 chunk_limit /= 2;
             };
-            let turn = self
-                .request_turn(&input, &ToolRegistry::new(), &mut |_| {})
-                .await?;
-            if !turn.calls().is_empty() {
-                return Err("智能压缩期间模型请求了工具，摘要未应用".into());
+            let mut last_valid_oversize = None;
+            for attempt in 0..3 {
+                let mut request = input.clone();
+                if attempt > 0 {
+                    request[0]["content"] = serde_json::json!(format!(
+                        "{}\nRETRY: the previous output was invalid or too long. Return only the required JSON arrays, no tools or markdown. Prefer fewer short entries, prioritize constraints and pending work. Target at most {} UTF-8 bytes, including JSON escaping. Do not answer the historical task.",
+                        input[0]["content"].as_str().unwrap(),
+                        plan.summary_limit() / 2
+                    ));
+                    events(RuntimeEvent::ContextCheckpoint {
+                        content: format!("摘要需要精简，正在重试（{attempt}/2）…"),
+                    });
+                }
+                if size(&request)? > limit {
+                    return Err(
+                        "CONTEXT_LIMIT: 摘要重试请求超过上下文长度，原始上下文未修改".into(),
+                    );
+                }
+                let turn = self
+                    .request_turn(&request, &ToolRegistry::new(), &mut |_| {})
+                    .await?;
+                let validation = if turn.calls().is_empty() {
+                    plan.validate(turn.text())
+                } else {
+                    Err("智能压缩期间模型请求了工具，摘要未应用".into())
+                };
+                match validation {
+                    Ok(valid) => {
+                        summary = valid;
+                        break;
+                    }
+                    Err(error) => {
+                        if turn.calls().is_empty() {
+                            if let Ok(fitted) = plan.fit_summary(turn.text()) {
+                                last_valid_oversize = Some(fitted);
+                            }
+                        }
+                        if attempt == 2 {
+                            if let Some(fitted) = last_valid_oversize.take() {
+                                summary = fitted;
+                                events(RuntimeEvent::ContextCheckpoint{content:"摘要仍偏长，已保留分类要点并标记省略；原始记录可回查，继续任务。".into()});
+                            } else {
+                                return Err(format!("智能压缩重试后仍失败：{error}"));
+                            }
+                        }
+                    }
+                }
             }
-            summary = plan.validate(turn.text())?;
             remaining = &remaining[chunk.len()..];
         }
         if summary.is_empty() {
@@ -286,7 +328,8 @@ impl ModelClient {
     ) -> Result<Turn, String> {
         let response = self
             .protocol
-            .request(&self.http, &self.config, history, tools)
+            .prepare_request(&self.http, &self.config, history, tools)
+            .await?
             .send()
             .await
             .map_err(|_| "model connection failed")?;

@@ -27,6 +27,7 @@ impl Core {
             &[json!({"type":"context.reset","content":"已开启新上下文，历史日志仍然保留。"})],
         )?;
         agent_runtime::workspace::revoke_conversation_approval(&format!("{project}:{group}"));
+        agent_runtime::execution::ProcessSessions::global().stop_chat(&project.to_string(), group);
         Ok(json!({"message":"已开启新上下文，保留项目成员、策略和历史日志。"}))
     }
 }

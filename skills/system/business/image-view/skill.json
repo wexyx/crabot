@@ -1,1 +1,1 @@
-{"description":"将工作目录 tmp 中的本地图片发布为 Web 可预览链接","enabled":true}
+{"description":"查看图片、看图片、显示图片、展示截图、显示截图、预览图片：将工作目录 tmp 中的本地图片发布为聊天可见的预览链接。Image preview / show image / display screenshot / share generated picture. 只负责展示，不执行 OCR 或识别图像内容。","enabled":true}

@@ -599,12 +599,13 @@ pub(crate) async fn begin_group(state: &AppState, input: RunRequest) -> Result<V
         Some(narrowed) => narrowed?,
         None => policy,
     };
-    if state.store.list("runs").await.iter().any(|r| {
+    if let Some(run) = state.store.list("runs").await.into_iter().find(|r| {
         r["project_id"] == json!(input.project_id)
             && r["group_id"] == input.group_id
             && matches!(r["status"].as_str(), Some("queued" | "running"))
     }) {
-        return Err("group is busy; interrupt it or wait before continuing".into());
+        super::steering::send(input.project_id, &input.group_id, input.content.clone()).await?;
+        return Ok(json!({"id":run["id"],"status":"steering_accepted"}));
     }
     if let Some(previous) = input.previous_session_id {
         let previous_doc = state
@@ -688,6 +689,7 @@ pub(crate) async fn begin_group(state: &AppState, input: RunRequest) -> Result<V
     let state = state.clone();
     let capability_project = input.group_id.clone();
     let workspace = group.body["workspace"].clone();
+    let mut mailbox = super::steering::Mailbox::new(input.project_id, input.group_id.clone());
     tokio::spawn(async move {
         let (tx, mut rx) = mpsc::channel::<String>(128);
         let dispatch = Dispatch {
@@ -696,27 +698,50 @@ pub(crate) async fn begin_group(state: &AppState, input: RunRequest) -> Result<V
             addressed: &input.mentions,
             ..Dispatch::new(&tx, &[])
         };
-        let future = super::project_execution::ProjectExecution::scope(
-            capability_project,
-            id,
-            workspace,
-            engine(
-                &state,
-                input.project_id,
-                &policy,
-                &execution_prompt,
-                &dispatch,
-            ),
-        );
-        tokio::pin!(future);
-        let mut cancellation = tokio::time::interval(Duration::from_millis(100));
+        let mut execution_prompt = execution_prompt;
         let answer = loop {
-            tokio::select! {
-                _=cancellation.tick()=>{if conversation::stopped(&state,id).await {break Err("group interrupted; partial progress retained".into());}},
-                result=&mut future=>break result,
-                Some(chunk)=rx.recv()=>{let output=event(id,"agent.activity",json!({"message_id":id,"content":chunk}));if persist_event(&state,input.project_id,&format!("session:{id}"),&output).await {let _=events.send(output);}}
+            let current_prompt = execution_prompt.clone();
+            let future = super::project_execution::ProjectExecution::scope(
+                capability_project.clone(),
+                id,
+                workspace.clone(),
+                engine(
+                    &state,
+                    input.project_id,
+                    &policy,
+                    &current_prompt,
+                    &dispatch,
+                ),
+            );
+            tokio::pin!(future);
+            let mut cancellation = tokio::time::interval(Duration::from_millis(100));
+            let result = loop {
+                tokio::select! {
+                    Some(request)=mailbox.recv()=>{
+                        if !mailbox.inbox().has_room(){let _=request.reply.send(Err("待处理引导过多，请等待 Agent 消化后继续".into()));continue;}
+                        let output=event(id,"message.created",json!({"message_id":Uuid::new_v4(),"content":request.content,"steering":true}));
+                        if persist_event(&state,input.project_id,&format!("session:{id}"),&output).await {
+                            mailbox.inbox().push(request.content);
+                            let _=events.send(output);let _=request.reply.send(Ok(()));
+                        }else{let _=request.reply.send(Err("引导消息保存失败，未交给 Agent".into()));}
+                    },
+                    _=cancellation.tick()=>{if conversation::stopped(&state,id).await {break Err("group interrupted; partial progress retained".into());}},
+                    result=&mut future=>break result,
+                    Some(chunk)=rx.recv()=>{let output=event(id,"agent.activity",json!({"message_id":id,"content":chunk}));if persist_event(&state,input.project_id,&format!("session:{id}"),&output).await {let _=events.send(output);}}
+                }
+            };
+            if result.is_err() {
+                break result;
             }
+            let pending = mailbox.inbox().take();
+            if pending.is_empty() {
+                break result;
+            }
+            // External providers/remote workers accept guidance at their next turn boundary.
+            // No concurrent replacement run and no loss of the original task or partial output.
+            execution_prompt.push_str(&format!("\nPrevious turn result (untrusted data):\n{}\nNew human guidance; reassess whether to continue, change or stop the earlier plan:\n{}",result.as_ref().unwrap(),pending.join("\n\n")));
         };
+        mailbox.close();
         while let Ok(chunk) = rx.try_recv() {
             let output = event(
                 id,

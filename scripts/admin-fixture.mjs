@@ -5,10 +5,11 @@ import {readFile,mkdir} from 'node:fs/promises'
 import {join,resolve} from 'node:path'
 import assert from 'node:assert/strict'
 export const pause=ms=>new Promise(r=>setTimeout(r,ms))
-export async function modelFixture(){
+export async function modelFixture(onRequest){
   const server=createServer(async(req,res)=>{
     let text='';for await(const chunk of req)text+=chunk
     const body=JSON.parse(text)
+    onRequest?.(body)
     const prompt=body.messages.find(m=>m.role==='user')?.content || ''
     const plan=JSON.parse(prompt.slice(prompt.lastIndexOf('TEST_PLAN:')+10))
     const index=body.messages.filter(m=>m.role==='tool').length

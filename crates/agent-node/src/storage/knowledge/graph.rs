@@ -38,7 +38,7 @@ pub(crate) fn for_project(project: uuid::Uuid) -> Option<Arc<Knowledge>> {
 ///
 /// This is the primary history store. Callers must report `None` as unavailable;
 /// there is no file-log fallback.
-fn open(root: &Path) -> Option<Arc<Knowledge>> {
+pub(super) fn open(root: &Path) -> Option<Arc<Knowledge>> {
     std::fs::create_dir_all(root).ok()?;
     let key = std::fs::canonicalize(root).ok()?;
     let map = OPEN.get_or_init(|| Mutex::new(HashMap::new()));
@@ -90,6 +90,7 @@ impl Knowledge {
             fts: OnceLock::new(),
         };
         knowledge.ensure_schema()?;
+        super::documents::schema(&knowledge)?;
         Ok(knowledge)
     }
 

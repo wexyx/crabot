@@ -24,6 +24,12 @@ pub(super) const ENTRIES: &[CommandEntry] = &[
     CommandEntry::new("/agents", "所有 Agent · 本地与远端", false),
     CommandEntry::new("/members", "当前项目成员", false),
     CommandEntry::new("/tools", "查看工具调用 · 可指定序号", true),
+    CommandEntry::new("/process", "进程会话 · list / read / input / stop", true),
+    CommandEntry::new(
+        "/docs",
+        "知识文档 · search / read / import / save / delete",
+        true,
+    ),
     CommandEntry::new("/attach", "附加文件 · 当前机器路径", true),
     CommandEntry::new("/detach", "清空待发送附件", false),
     CommandEntry::new("/permissions", "查看 / 切换执行权限", true),

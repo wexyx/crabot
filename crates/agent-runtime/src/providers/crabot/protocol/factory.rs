@@ -9,7 +9,7 @@ impl ProtocolFactory {
         match api {
             ModelApi::Chat => Box::new(ChatProtocol),
             ModelApi::Responses => Box::new(ResponsesProtocol),
-            ModelApi::Anthropic => Box::new(AnthropicProtocol),
+            ModelApi::Anthropic => Box::new(AnthropicProtocol::new()),
         }
     }
 }

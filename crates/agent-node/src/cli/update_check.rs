@@ -7,12 +7,13 @@ struct Release {
     prerelease: bool,
     draft: bool,
 }
-fn version(value: &str) -> Option<(u64, u64, u64)> {
+fn version(value: &str) -> Option<(u64, u64, u64, u64)> {
     let mut parts = value.strip_prefix('v')?.split('-').next()?.split('.');
     let result = (
         parts.next()?.parse().ok()?,
         parts.next()?.parse().ok()?,
         parts.next()?.parse().ok()?,
+        parts.next().map(str::parse).transpose().ok()?.unwrap_or(0),
     );
     parts.next().is_none().then_some(result)
 }
@@ -73,5 +74,20 @@ mod tests {
         assert!(!newer("v1.2.3", "v1.2.3"));
         assert!(!newer("v2.0.0", "v1.9.0"));
         assert!(!newer("v1.0.0", "v9.0.0\n"));
+    }
+
+    #[test]
+    fn compares_four_part_patch_releases() {
+        assert!(newer("v0.1.4", "v0.1.4.1"));
+        assert!(newer("v0.1.4.1", "v0.1.4.2"));
+        assert!(newer("v0.1.4.9", "v0.1.4.10"));
+        assert!(newer("v0.1.4.1", "v0.1.5"));
+        assert!(newer("v0.1.4.1-dev", "v0.1.4.1"));
+        assert!(!newer("v0.1.4.1", "v0.1.4"));
+        assert!(!newer("v0.1.4.1", "v0.1.4.1"));
+        assert!(!newer("v0.1.4", "v0.1.4.0"));
+        assert!(version("v0.1.4.1.2").is_none());
+        assert!(version("v0.1.4.x").is_none());
+        assert!(version("v0.1.4.1\n").is_none());
     }
 }

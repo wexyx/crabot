@@ -16,12 +16,21 @@ pub struct HarnessConfig {
     pub base: String,
     pub key: String,
     pub model: String,
-    pub max_tokens: u64,
+    pub max_tokens: Option<u64>,
     pub deepseek_effort: Option<String>,
     pub root: PathBuf,
 }
 
 impl HarnessConfig {
+    /// Automatic output headroom is only used for local context accounting;
+    /// it is not an output limit sent to the model.
+    pub(super) fn input_limit(&self) -> Result<usize, String> {
+        let reserve = self
+            .max_tokens
+            .unwrap_or((self.context.input_limit(0)? / 4) as u64);
+        self.context.input_limit(reserve)
+    }
+
     pub(crate) fn validate(mut self) -> Result<Self, String> {
         if !(self.base.starts_with("http://") || self.base.starts_with("https://")) {
             return Err("MODEL_BASE_URL must be an HTTP(S) URL".into());
@@ -32,7 +41,10 @@ impl HarnessConfig {
         if self.system_prompt.trim().is_empty() {
             self.system_prompt = super::prompt::default_system_prompt().into();
         }
-        self.context.input_limit(self.max_tokens)?;
+        if self.max_tokens == Some(0) {
+            return Err("HARNESS_MAX_TOKENS must be positive".into());
+        }
+        self.input_limit()?;
         self.root = std::fs::canonicalize(self.root).map_err(|_| "AGENT_WORKDIR does not exist")?;
         self.base = self.base.trim_end_matches('/').into();
         Ok(self)
@@ -96,11 +108,11 @@ impl HarnessConfig {
             .filter(|v| !v.trim().is_empty())
             .unwrap_or_else(|| super::prompt::default_system_prompt().into());
         let max_tokens = get("HARNESS_MAX_TOKENS")
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| "4096".into())
-            .parse()
+            .filter(|v| !v.trim().is_empty())
+            .map(|v| v.trim().parse::<u64>())
+            .transpose()
             .map_err(|_| "invalid HARNESS_MAX_TOKENS")?;
-        if max_tokens == 0 {
+        if max_tokens == Some(0) {
             return Err("HARNESS_MAX_TOKENS must be positive".into());
         }
         let deepseek_effort = if vendor == "deepseek" && api != ModelApi::Anthropic {
@@ -127,8 +139,7 @@ impl HarnessConfig {
                 .unwrap_or_else(crate::paths::user_home),
         )
         .map_err(|_| "AGENT_WORKDIR does not exist")?;
-        context.input_limit(max_tokens)?;
-        Ok(Self {
+        Self {
             environment,
             context,
             system_prompt,
@@ -139,7 +150,8 @@ impl HarnessConfig {
             max_tokens,
             deepseek_effort,
             root,
-        })
+        }
+        .validate()
     }
 }
 
@@ -252,7 +264,7 @@ mod tests {
         }
         let cfg = config("deepseek", &[]).unwrap();
         assert_eq!(cfg.deepseek_effort.as_deref(), Some("none"));
-        assert_eq!(cfg.max_tokens, 4096);
+        assert_eq!(cfg.max_tokens, None);
         assert!(config("openai", &[]).unwrap().deepseek_effort.is_none());
         assert!(config("deepseek", &[("HARNESS_MAX_TOKENS", "0")]).is_err());
         assert!(config("deepseek", &[("MODEL_THINKING", "invalid")]).is_err());

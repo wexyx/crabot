@@ -48,6 +48,7 @@ impl Core {
             .policy_store
             .put(project, "group", id, version, row.body)
             .await?;
+        agent_runtime::execution::ProcessSessions::global().stop_chat(&project.to_string(), id);
         Ok(json!({"id":id,"deleted":true,"history_retained":true}))
     }
 }

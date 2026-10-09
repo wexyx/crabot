@@ -7,6 +7,7 @@ mod editor;
 mod help;
 mod output;
 mod presentation;
+mod processes;
 mod project_selection;
 mod repl;
 mod screen;
@@ -29,4 +30,5 @@ mod prompts;
 mod update_check;
 mod updater;
 
+mod documents;
 mod footer;

@@ -22,7 +22,10 @@ impl ModelProtocol for ResponsesProtocol {
         history: &[Value],
         tools: &ToolRegistry,
     ) -> reqwest::RequestBuilder {
-        let mut body = json!({"model":cfg.model,"instructions":cfg.system_prompt,"input":history,"tools":self.tools(tools),"stream":true,"store":false,"include":["reasoning.encrypted_content"],"max_output_tokens":cfg.max_tokens});
+        let mut body = json!({"model":cfg.model,"instructions":cfg.system_prompt,"input":history,"tools":self.tools(tools),"stream":true,"store":false,"include":["reasoning.encrypted_content"]});
+        if let Some(limit) = cfg.max_tokens {
+            body["max_output_tokens"] = json!(limit);
+        }
         if let Some(effort) = &cfg.deepseek_effort {
             body["reasoning"] = json!({"effort":effort});
         }

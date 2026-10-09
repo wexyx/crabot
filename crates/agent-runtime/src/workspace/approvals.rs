@@ -168,3 +168,21 @@ async fn enqueue(
         _ => Err("human permission expired or cancelled".into()),
     }
 }
+
+pub(crate) async fn confirm_process_input(
+    root: &std::path::Path,
+    command: &str,
+    input: &str,
+) -> Result<(), String> {
+    if crate::permissions::PermissionMode::current() == crate::permissions::PermissionMode::Full {
+        return Ok(());
+    }
+    // Raw terminal input is not necessarily a shell command. Never whitelist it.
+    enqueue(
+        root,
+        root,
+        "向已有进程发送输入；输入可能执行额外命令。",
+        Some(format!("进程：{command}\n输入：{input}")),
+    )
+    .await
+}

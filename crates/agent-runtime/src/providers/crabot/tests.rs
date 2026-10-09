@@ -18,7 +18,7 @@ fn protocol_factory_formats_tools_and_authentication() {
             base: "http://localhost/v1".into(),
             key: "test-secret".into(),
             model: "fixture".into(),
-            max_tokens: 256,
+            max_tokens: Some(256),
             deepseek_effort: None,
             root: PathBuf::from("."),
         };
@@ -156,7 +156,7 @@ async fn all_three_protocols_complete_twenty_tool_roundtrips() {
                 base: format!("http://{address}"),
                 key: "fixture".into(),
                 model: "fixture".into(),
-                max_tokens: 256,
+                max_tokens: Some(256),
                 deepseek_effort: None,
                 root: PathBuf::from(env!("CARGO_MANIFEST_DIR")),
             };

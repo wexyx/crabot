@@ -45,6 +45,8 @@ pub(super) fn parse(line: &str) -> Result<Command, String> {
     }
     Ok(match head {
         "attach" => Command::Attach(tail.trim().into()),
+        "process" => Command::Workbench("process".into(), serde_json::json!({"args":tail})),
+        "docs" => Command::Workbench("docs".into(), serde_json::json!({"args":tail})),
         "detach" => Command::Detach,
         "add-agent" | "remove-agent" | "agent" | "group" => {
             Command::Group(format!("/{head} {tail}"))

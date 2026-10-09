@@ -47,7 +47,7 @@ fn unknown_runtime_and_invalid_explicit_config_fail_at_factory() {
         base: "file:///private".into(),
         key: "fixture".into(),
         model: "fixture".into(),
-        max_tokens: 64,
+        max_tokens: Some(64),
         deepseek_effort: None,
         root: ".".into(),
     };

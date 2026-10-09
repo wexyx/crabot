@@ -23,7 +23,11 @@ impl ModelProtocol for ChatProtocol {
     ) -> reqwest::RequestBuilder {
         let mut messages = vec![json!({"role":"system","content":cfg.system_prompt})];
         messages.extend_from_slice(history);
-        let mut body = json!({"model":cfg.model,"messages":messages,"tools":self.tools(tools),"stream":true,"max_tokens":cfg.max_tokens});
+        let mut body =
+            json!({"model":cfg.model,"messages":messages,"tools":self.tools(tools),"stream":true});
+        if let Some(limit) = cfg.max_tokens {
+            body["max_tokens"] = json!(limit);
+        }
         if let Some(effort) = &cfg.deepseek_effort {
             body["thinking"] =
                 json!({"type": if effort == "none" { "disabled" } else { "enabled" }});

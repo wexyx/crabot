@@ -24,4 +24,6 @@ mod opencode;
 
 mod attachments;
 mod command_allowlist;
+mod documents;
+mod process_sessions;
 mod system_prompts;

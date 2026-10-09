@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 pub(super) enum Write {
     Event(Value),
+    Barrier(tokio::sync::oneshot::Sender<Result<(), String>>),
     Finish { event: Value, status: &'static str },
 }
 pub(super) async fn run(
@@ -20,6 +21,10 @@ pub(super) async fn run(
     loop {
         tokio::select! {
             message=rx.recv()=> match message {
+                Some(Write::Barrier(reply))=>{
+                    let result=if batch.is_empty(){Ok(())}else{session::append_batch(&core,id,std::mem::take(&mut batch),None).await.map(|_|())};
+                    let _=reply.send(result.clone());result?;
+                },
                 Some(Write::Event(event))=>{
                     let boundary=event["type"]!="text_delta";
                     batch.push(event);

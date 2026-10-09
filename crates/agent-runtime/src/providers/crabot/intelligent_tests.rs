@@ -10,14 +10,15 @@ use std::sync::{
 };
 #[tokio::test]
 async fn intelligent_compression_keeps_recent_and_preserves_original_on_failure() {
-    for valid in [true, false] {
+    for (valid, oversized) in [(true, false), (false, false), (true, true)] {
         let count = Arc::new(AtomicUsize::new(0));
         let counter = count.clone();
         let app=axum::Router::new().fallback(axum::routing::post(move |axum::Json(body):axum::Json<Value>|{let counter=counter.clone();async move {
     counter.fetch_add(1,Ordering::SeqCst);
     assert!(body["messages"][1]["content"].as_str().unwrap().contains("COMPACTION TASK"));
     assert!(body["tools"].as_array().unwrap().is_empty());
-    let summary=if valid {json!({"goals":["retain important objective"],"constraints":["preserve logs"],"decisions":[],"completed":[],"pending":["verify changes"],"risks":[],"references":[]}).to_string()}else{"not JSON".into()};
+    let goal=if oversized{"retain important objective ".repeat(2000)}else{"retain important objective".into()};
+    let summary=if valid {json!({"goals":[goal],"constraints":["preserve logs"],"decisions":[],"completed":[],"pending":["verify changes"],"risks":[],"references":[]}).to_string()}else{"not JSON".into()};
     ([("content-type","text/event-stream")],format!("data: {}\n\n",json!({"choices":[{"delta":{"content":summary},"finish_reason":"stop"}]})))
   }}));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -36,7 +37,7 @@ async fn intelligent_compression_keeps_recent_and_preserves_original_on_failure(
             base: format!("http://{address}"),
             key: "fixture".into(),
             model: "fixture".into(),
-            max_tokens: 1024,
+            max_tokens: Some(1024),
             deepseek_effort: None,
             root: ".".into(),
         })
@@ -52,6 +53,10 @@ async fn intelligent_compression_keeps_recent_and_preserves_original_on_failure(
             .await;
         server.abort();
         assert!(count.load(Ordering::SeqCst) > 0);
+        if oversized {
+            assert!(count.load(Ordering::SeqCst) >= 3);
+            assert!(count.load(Ordering::SeqCst) <= 30);
+        }
         assert!(
             events
                 .iter()

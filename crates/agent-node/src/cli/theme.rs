@@ -9,18 +9,25 @@ pub(super) struct Theme {
 }
 impl Theme {
     pub(super) fn write_banner(&self, out: &mut impl Write, text: &str) -> std::io::Result<()> {
-        if !self.enabled || !(text.contains('█') || text.contains('░')) {
+        let Some((crab, ot)) = super::wordmark::color_parts(text).filter(|_| self.enabled) else {
             return self.write(out, text);
-        }
-        for glyph in text.chars() {
-            let color = if matches!(glyph, '█' | '▄' | '▀') {
-                Color::Cyan
-            } else {
-                Color::DarkGrey
-            };
-            queue!(out, SetForegroundColor(color), Print(glyph))?;
-        }
-        queue!(out, ResetColor)
+        };
+        queue!(
+            out,
+            SetForegroundColor(Color::Rgb {
+                r: 74,
+                g: 144,
+                b: 226
+            }),
+            Print(crab),
+            SetForegroundColor(Color::Rgb {
+                r: 166,
+                g: 184,
+                b: 204
+            }),
+            Print(ot),
+            ResetColor
+        )
     }
     pub(super) fn new() -> Self {
         Self {
@@ -133,6 +140,39 @@ impl Theme {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn banner_uses_two_colors_and_respects_no_color() {
+        for line in super::super::wordmark::lines(80) {
+            let mut colored = Vec::new();
+            Theme { enabled: true }
+                .write_banner(&mut colored, &line)
+                .unwrap();
+            let text = String::from_utf8(colored).unwrap();
+            let (crab, ot) = super::super::wordmark::color_parts(&line).unwrap();
+            assert_eq!(
+                text,
+                format!(
+                    "{}{crab}{}{ot}{}",
+                    SetForegroundColor(Color::Rgb {
+                        r: 74,
+                        g: 144,
+                        b: 226
+                    }),
+                    SetForegroundColor(Color::Rgb {
+                        r: 166,
+                        g: 184,
+                        b: 204
+                    }),
+                    ResetColor
+                )
+            );
+            let mut plain = Vec::new();
+            Theme { enabled: false }
+                .write_banner(&mut plain, &line)
+                .unwrap();
+            assert_eq!(String::from_utf8(plain).unwrap(), line);
+        }
+    }
     #[test]
     fn semantic_colors_and_no_color_mode() {
         assert_eq!(Theme::color("│ 默认 Agent"), Some(Color::DarkGrey));

@@ -312,11 +312,22 @@ pub(super) async fn execute(
                     )
                     .await?,
                 )?;
-                agent_runtime::context::HistoryAccess::scope(
-                    source,
-                    runtime.run_events(&prompt, &mut move |chunk| {
-                        let _ = tx.send(chunk);
-                    }),
+                agent_runtime::context::Guidance::scope(
+                    super::steering::inbox(
+                        credential.project_id,
+                        command.data["capability_project"]
+                            .as_str()
+                            .unwrap_or("unbound"),
+                    ),
+                    agent_runtime::context::DocumentAccess::scope(
+                        Arc::new(crate::documents::Documents::new()),
+                        agent_runtime::context::HistoryAccess::scope(
+                            source,
+                            runtime.run_events(&prompt, &mut move |chunk| {
+                                let _ = tx.send(chunk);
+                            }),
+                        ),
+                    ),
                 )
                 .await
             })
@@ -350,6 +361,15 @@ pub(super) async fn execute(
             work.await
         }
     });
+    let process_scope = agent_runtime::execution::SessionScope::new(
+        credential.project_id.to_string(),
+        command.data["capability_project"]
+            .as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("session:{}", command.session_id)),
+        credential.client_id.clone(),
+    );
+    let task = process_scope.run(task);
     tokio::pin!(task);
     let mut cancellation = tokio::time::interval(Duration::from_millis(100));
     let result = loop {

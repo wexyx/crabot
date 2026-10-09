@@ -12,6 +12,8 @@ pub(crate) fn router_with_manager(state: AppState, manager: Arc<management::Mana
         .merge(crate::http::attachments::routes())
         .merge(crate::http::command_allowlist::routes(manager.clone()))
         .merge(crate::http::system_prompts::routes(manager.clone()))
+        .merge(crate::http::process_sessions::routes(manager.clone()))
+        .merge(crate::http::documents::routes(manager.clone()))
         .merge(crate::http::admin::routes(manager.clone()))
         .merge(crate::http::admin_configuration::routes(manager.clone()))
         .merge(crate::http::opencode::routes(manager.clone()))

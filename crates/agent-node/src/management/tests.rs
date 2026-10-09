@@ -202,7 +202,7 @@ async fn natural_language_harness_calls_registered_tools_and_persists_history() 
         base,
         key: "fixture".into(),
         model: "fixture".into(),
-        max_tokens: 1024,
+        max_tokens: Some(1024),
         deepseek_effort: None,
         root: ".".into(),
     }))
@@ -210,7 +210,8 @@ async fn natural_language_harness_calls_registered_tools_and_persists_history() 
     .unwrap();
     let id = serde_json::from_value(m.create_session(p).await.unwrap()["id"].clone()).unwrap();
     m.message(p, id, "建立一个研发接力群".into()).await.unwrap();
-    assert!(m.message(p, id, "concurrent".into()).await.is_err());
+    // Running conversations now accept steering; its boundary/persistence behavior
+    // is covered separately by the gated model integration fixture.
     wait(&m, p, id).await;
     let row = m.history(p, id).await.unwrap();
     assert_eq!(row["status"], "completed", "{row}");

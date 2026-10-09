@@ -47,6 +47,31 @@ impl NativeCommand {
         self.scratch.path()
     }
     pub(crate) fn command(&self, binary: &Path, root: &Path) -> Result<Command, String> {
+        self.build_command(binary, root, false)
+    }
+    pub(crate) fn shell_command(
+        &self,
+        root: &Path,
+        home: &Path,
+        interactive: bool,
+    ) -> Result<Command, String> {
+        std::fs::create_dir_all(home).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(home, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| e.to_string())?;
+        }
+        let mut command = self.build_command(Path::new("/bin/sh"), root, interactive)?;
+        command
+            .env("HOME", home)
+            .env("XDG_CONFIG_HOME", home.join(".config"))
+            .env("XDG_CACHE_HOME", home.join(".cache"))
+            .env("TERM", "dumb");
+        crate::environment::AgentEnvironment::apply(&mut command);
+        Ok(command)
+    }
+    fn build_command(&self, binary: &Path, root: &Path, terminal: bool) -> Result<Command, String> {
         let binary = resolve_binary(binary)?;
         let root = root.canonicalize().map_err(|e| e.to_string())?;
         if !root.is_dir() {
@@ -94,7 +119,9 @@ impl NativeCommand {
             }
         }
         #[cfg(unix)]
-        command.process_group(0);
+        if !terminal {
+            command.process_group(0);
+        }
         crate::environment::AgentEnvironment::apply(&mut command);
         Ok(command)
     }

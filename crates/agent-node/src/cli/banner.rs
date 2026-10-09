@@ -14,10 +14,7 @@ pub(super) fn text(server: Option<&str>, columns: usize) -> String {
             }
         })
         .unwrap_or_else(|_| data.display().to_string());
-    let mut lines: Vec<String> = super::wordmark::lines(width)
-        .iter()
-        .map(|line| (*line).into())
-        .collect();
+    let mut lines = super::wordmark::lines(width);
     lines.push(String::new());
     let mut metadata = String::new();
     for value in [

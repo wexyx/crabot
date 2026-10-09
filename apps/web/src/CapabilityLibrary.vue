@@ -8,7 +8,7 @@ import CapabilityAgents from './CapabilityAgents.vue'
 import {parseSkillImport,parseToolImport} from './capability-import.js'
 const props=defineProps({request:Function,project:String,group:String,scope:String,kind:String})
 const emit=defineEmits(['close','switch'])
-function switchKind(kind){if(dirty.value){error.value='请先保存或取消编辑后切换。';return}emit('switch',kind==='tool'?'tools':'skills')}
+function switchKind(kind){if(dirty.value){error.value='请先保存或取消编辑后切换。';return}emit('switch',kind==='doc'?'docs':kind==='tool'?'tools':'skills')}
 const contextProject=ref(props.project),contextGroup=ref(props.group||''),projectCatalog=ref([]),agent=ref(props.scope==='management'?'admin':''),data=ref({rows:[],projects:[],agents:[]})
 const panel=ref('')
 const drawerOpen=computed({get:()=>!!panel.value,set:value=>{if(!value)panel.value=''}})
@@ -89,7 +89,7 @@ watch(scripts,()=>{if(!scripts.value.includes(testScript.value))testScript.value
 </script>
 <template>
 <ConfigPanel inline :title="(scope==='management'?'管理':'项目')+'能力库'" eyebrow="SHARED CAPABILITIES" description="统一维护工具与 Skill，在 Agent 表格中直接启用或停用。" :busy="busy" :dirty="dirty" @close="$emit('close')">
- <el-tabs class="capability-tabs" :model-value="kind" @tab-change="switchKind"><el-tab-pane label="工具" name="tool" :disabled="busy"/><el-tab-pane label="Skills" name="skill" :disabled="busy"/></el-tabs>
+ <el-tabs class="capability-tabs" :model-value="kind" @tab-change="switchKind"><el-tab-pane label="工具" name="tool" :disabled="busy"/><el-tab-pane label="Skills" name="skill" :disabled="busy"/><el-tab-pane v-if="scope!=='management'" label="知识库" name="doc" :disabled="busy"/></el-tabs>
  <div v-if="error" class="config-alert danger" role="alert">{{error}}</div><div v-if="notice" class="config-alert success" role="status">{{notice}}</div>
  <input ref="upload" type="file" :multiple="kind==='skill'" :accept="kind==='tool'?'.json':undefined" hidden @change="importFiles"><input ref="folder" type="file" webkitdirectory multiple hidden @change="importFiles">
  <div class="library-body">

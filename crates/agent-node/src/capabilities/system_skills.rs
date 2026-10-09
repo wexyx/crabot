@@ -157,7 +157,13 @@ mod tests {
     fn repository_skills_load_as_readonly_and_never_grant_python() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../skills/system");
         let rows = read(&root, "business").unwrap();
-        assert_eq!(rows.len(), 5);
+        assert_eq!(rows.len(), 7);
+        for id in ["web-search", "coding"] {
+            assert!(
+                rows.iter()
+                    .any(|r| r.definition["id"] == id && r.definition["enabled"] == true)
+            );
+        }
         for row in rows {
             assert!(row.readonly);
             assert_eq!(row.definition["allow_python"], false);

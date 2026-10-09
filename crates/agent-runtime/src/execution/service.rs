@@ -95,9 +95,18 @@ pub async fn initialize() -> Result<(), String> {
     Ok(())
 }
 pub async fn shutdown() {
+    super::ProcessSessions::global().shutdown().await;
     if let Some(service) = SERVICE.get() {
         service.shutdown().await;
     }
+}
+pub(crate) async fn profile(id: &str) -> Result<Profile, String> {
+    service()
+        .await?
+        .profiles
+        .get(id)
+        .cloned()
+        .ok_or("unknown execution profile".into())
 }
 
 pub(crate) async fn execute_command(

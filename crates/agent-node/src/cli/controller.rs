@@ -25,6 +25,7 @@ pub(super) struct Controller {
     navigation: Vec<(Uuid, Uuid, Option<String>, Option<Uuid>)>,
     attachments: Vec<agent_runtime::attachments::Attachment>,
     chat_picker: Option<super::project_selection::ProjectPicker>,
+    process_input: Option<String>,
 }
 impl Controller {
     pub(super) async fn new(manager: Arc<Manager>) -> Result<Self, String> {
@@ -41,10 +42,17 @@ impl Controller {
             navigation: Vec::new(),
             attachments: Vec::new(),
             chat_picker: None,
+            process_input: None,
         })
     }
     pub(super) fn group(&self) -> Option<String> {
         self.group.clone()
+    }
+    pub(super) fn private_input(&self) -> bool {
+        self.process_input.is_some()
+    }
+    pub(super) fn cancel_process_input(&mut self) -> bool {
+        self.process_input.take().is_some()
     }
     pub(super) fn view(&self) -> (Uuid, Uuid, Option<String>) {
         (
@@ -128,6 +136,26 @@ impl Controller {
         self.chat_picker.take().is_some()
     }
     pub(super) async fn execute(&mut self, line: &str) -> Result<Action, String> {
+        if let Some(id) = self.process_input.take() {
+            if line.trim() == "/cancel" {
+                return Ok(Action {
+                    text: "已取消进程输入。".into(),
+                    ..Default::default()
+                });
+            }
+            self.manager
+                .process_sessions(
+                    self.project,
+                    self.group.as_deref().unwrap_or("admin"),
+                    "write",
+                    serde_json::json!({"session_id":id,"input":format!("{line}\n"),"private":true}),
+                )
+                .await?;
+            return Ok(Action {
+                text: "已发送到进程；/process read ID 查看状态。".into(),
+                ..Default::default()
+            });
+        }
         if line.trim() == "/cancel" && self.cancel_chat_choice() {
             return Ok(Action {
                 text: "已取消选择聊天。".into(),
@@ -319,6 +347,26 @@ impl Controller {
                 return Ok(action);
             }
             Command::Workbench(op, input) => {
+                if op == "docs" {
+                    action.text = super::documents::command(
+                        &self.manager,
+                        input["args"].as_str().unwrap_or(""),
+                    )
+                    .await?;
+                    return Ok(action);
+                }
+                if op == "process" {
+                    let (text, next) = super::processes::command(
+                        &self.manager,
+                        self.project,
+                        self.group.as_deref().unwrap_or("admin"),
+                        input["args"].as_str().unwrap_or(""),
+                    )
+                    .await?;
+                    self.process_input = next;
+                    action.text = text;
+                    return Ok(action);
+                }
                 let result = self.manager.workbench(self.project, &op, input).await?;
                 if op == "projects.list" {
                     self.chat_picker = super::project_selection::ProjectPicker::new(

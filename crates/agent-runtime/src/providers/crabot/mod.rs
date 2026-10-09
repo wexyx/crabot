@@ -19,3 +19,5 @@ mod context_tests;
 mod image_tests;
 #[cfg(test)]
 mod intelligent_tests;
+#[cfg(test)]
+mod output_tests;

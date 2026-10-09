@@ -30,7 +30,7 @@ watch(()=>props.values.OPENCODE_BIN,()=>{if(provider.value==='opencode')loadMode
   <template v-if="provider==='crabot'">
    <el-form-item label="模型厂商"><el-select v-model="values.MODEL_PROVIDER" aria-label="模型厂商"><el-option v-for="value in ['openai','anthropic','gemini','deepseek','qwen','ark','ollama','compatible']" :key="value" :value="value" :label="value"/></el-select></el-form-item>
    <el-form-item label="上下文长度"><el-input v-model="values.CONTEXT_MAX_TOKENS" placeholder="65536（含输出预留）" aria-label="上下文长度"/></el-form-item>
-   <el-form-item label="最大输出长度"><el-input v-model="values.HARNESS_MAX_TOKENS" placeholder="4096" aria-label="最大输出长度"/><small>单次请求的输出上限，不是目标字数。</small></el-form-item>
+   <el-form-item label="最大输出长度（可选）"><el-input v-model="values.HARNESS_MAX_TOKENS" placeholder="留空：不额外限制" clearable aria-label="最大输出长度"/><small>留空使用模型服务默认值；Anthropic 自动读取模型上限。填写时才额外限制输出长度。</small></el-form-item>
    <template v-if="values.MODEL_PROVIDER==='deepseek' &amp;&amp; values.MODEL_API!=='anthropic'">
     <el-form-item label="思考模式"><el-select :model-value="values.MODEL_THINKING||'disabled'" @update:model-value="values.MODEL_THINKING=$event" aria-label="思考模式"><el-option value="disabled" label="关闭 · 优先速度"/><el-option value="enabled" label="开启 · 复杂任务"/></el-select></el-form-item>
     <el-form-item v-if="values.MODEL_THINKING==='enabled'" label="思考强度"><el-select :model-value="values.MODEL_REASONING_EFFORT||'low'" @update:model-value="values.MODEL_REASONING_EFFORT=$event" aria-label="思考强度"><el-option value="low" label="低 · 更快"/><el-option value="high" label="高"/><el-option value="max" label="最高 · 更慢"/></el-select></el-form-item>

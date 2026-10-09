@@ -18,7 +18,7 @@ Provider 通过 `handles_tools` 声明是否自行管理工具循环。Crabot �
 
 询问「有哪些 Skill」时，模型调用 `find({"target":"skill"})`，无需猜关键词或提前知道 ID。返回当前 Agent 可用的 Skill ID、说明和文件名，不包含指令正文；`find({"target":"tool"})` 同样可以列出工具名称与说明。列表受每页数量限制，`truncated=true` 时保持查询条件并传 `offset=next_offset` 继续。`registered` 是可用总数，`matched` 是关键词匹配数，两者不同：关键词没有命中不代表未注册或缺少说明，应去掉 `query` 查看列表。显式选择 Skill 类别后，单独的 `skill` / `skills` / `技能` 关键词也按列目录处理。
 
-- `find`：统一检索入口。`target=tool` 按 `name` 精确取一个工具，或用 `query` 关键词匹配工具名与说明，命中项在下一轮变为可调用工具（deep 及以上附带 schema）；`target=skill` 用 `query` 列出 Skill 的 id、说明与文件名；传入 `id` 则直接加载完整说明及脚本目录（`skills[0].directory`）；`target=history` 在本项目内跨会话检索历史，返回会话名、序号与摘要片段，背后是随每次写入增量更新的知识索引；`target=doc` 知识库尚未建设，调用成功并明确返回不可用，而不是报错让模型反复重试。`depth`（brief/normal/deep/exhaustive）控制返回数量，受运维上限钳制。
+- `find`：统一检索入口。`target=tool` 按 `name` 精确取一个工具，或用 `query` 关键词匹配工具名与说明，命中项在下一轮变为可调用工具（deep 及以上附带 schema）；`target=skill` 用 `query` 列出 Skill 的 id、说明与文件名；传入 `id` 则直接加载完整说明及脚本目录（`skills[0].directory`）；`target=history` 在本项目内跨会话检索历史，返回会话名、序号与摘要片段，背后是随每次写入增量更新的知识索引；`target=doc` 检索当前知识库，传 `id` 按块读取；通过 `doc` 工具导入网址或本地文档、保存正文和版本化增删改。详见 [知识库与任务](knowledge-and-tasks.md)。`depth`（brief/normal/deep/exhaustive）控制返回数量，受运维上限钳制。
 - `compact`：通过 `find(target=tool, query=compact)` 解锁，只做上下文管理，不再接收摘要文本。`strategy=summary`（默认）触发宿主驱动压缩：宿主把当前上下文窗口交给模型生成摘要，写入摘要索引（按 `(chat, agent)` 隔离），并把窗口压缩为摘要；`strategy=recent` 仅丢弃旧工具轮次。需要过去的内容一律用 `find(target=history)` ；不传 query 时按序号范围读取原文。
 
 披露只影响「展示」，不改变「授权」：执行始终走完整注册表，被策略移除的工具既查不到也调不了。Crabot 原生循环每轮按已解锁集合投影；桥接每轮重建提示词头部，因此新解锁的工具下一次请求即可调用。Skill 正文只在 `find(target=skill, id=...)` 返回后进入上下文，不再预先注入。

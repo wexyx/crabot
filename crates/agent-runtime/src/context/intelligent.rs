@@ -38,7 +38,18 @@ impl SummaryPlan {
             .iter()
             .filter_map(|m| prompt.rfind(m))
             .max();
-        let (prior, current) = split.map(|i| prompt.split_at(i)).unwrap_or(("", prompt));
+        let (prior, initial) = split.map(|i| prompt.split_at(i)).unwrap_or(("", prompt));
+        // Keep later human steering verbatim; a summary must never silently weaken it.
+        let mut current = initial.to_owned();
+        for row in history.iter().skip(1).filter(|r| r["role"] == "user") {
+            current.push_str("\nSubsequent human guidance:\n");
+            current.push_str(
+                &row["content"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| row["content"].to_string()),
+            );
+        }
         let end = [
             "\nPrevious records (",
             "\nPrevious topic records",
@@ -116,39 +127,14 @@ impl SummaryPlan {
         )
     }
     pub fn validate(&self, text: &str) -> Result<String, String> {
-        let text = text.trim();
-        let text = text
-            .strip_prefix("```json")
-            .and_then(|s| s.trim().strip_suffix("```"))
-            .unwrap_or(text)
-            .trim();
-        let value: Value = serde_json::from_str(text)
-            .map_err(|_| "智能压缩返回的摘要不是有效 JSON，原始上下文未修改")?;
-        let keys = [
-            "goals",
-            "constraints",
-            "decisions",
-            "completed",
-            "pending",
-            "risks",
-            "references",
-        ];
-        let object = value.as_object().ok_or("摘要必须是 JSON 对象")?;
-        if object.len() != keys.len()
-            || keys.iter().any(|k| {
-                !object
-                    .get(*k)
-                    .and_then(Value::as_array)
-                    .is_some_and(|a| a.iter().all(Value::is_string))
-            })
-        {
-            return Err("智能压缩摘要结构无效，原始上下文未修改".into());
-        }
-        let text = value.to_string();
+        let text = super::summary_repair::parse(text)?.to_string();
         if text.len() > self.summary_limit {
             return Err("智能压缩摘要过长，原始上下文未修改".into());
         }
         Ok(text)
+    }
+    pub(crate) fn fit_summary(&self, text: &str) -> Result<String, String> {
+        super::summary_repair::fit(text, self.summary_limit)
     }
     /// Durable summaries must also retain the original rows kept outside the
     /// model-generated digest; otherwise the stored coverage would hide them.

@@ -4,6 +4,7 @@ mod capabilities;
 mod cli;
 mod configuration;
 mod core;
+mod documents;
 mod http;
 mod management;
 mod prelude;

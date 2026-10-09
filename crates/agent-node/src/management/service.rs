@@ -216,6 +216,8 @@ impl Manager {
     }
     pub(crate) async fn interrupt(&self, project: Uuid, id: Uuid) -> Result<Value, String> {
         self.history(project, id).await?;
+        agent_runtime::execution::ProcessSessions::global()
+            .stop_chat(&project.to_string(), "admin");
         let active = self.active.lock().await;
         if let Some(sender) = active.get(&id) {
             let _ = sender.send(true);
@@ -239,7 +241,9 @@ impl Manager {
             .clone()
             .ok_or("management agent not started")?;
         if active.contains_key(&id) {
-            return Err("management session busy; interrupt or wait".into());
+            self.history(project, id).await?;
+            crate::core::steering::send(project, "admin", content).await?;
+            return Ok(json!({"session_id":id,"status":"steering_accepted"}));
         }
         if active.len() >= 8 {
             return Err("too many active management sessions".into());
@@ -291,9 +295,11 @@ impl Manager {
             self.journal.clone(),
             id,
             runtime,
+            project,
             source,
             prompt,
             cancelled,
+            crate::core::steering::Mailbox::new(project, "admin".into()),
         ));
         Ok(json!({"session_id":id,"status":"accepted"}))
     }

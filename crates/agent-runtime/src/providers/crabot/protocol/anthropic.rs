@@ -6,8 +6,36 @@ use super::contract::ModelProtocol;
 use crate::tools::{ToolDefinition, ToolRegistry};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-pub(super) struct AnthropicProtocol;
+pub(super) struct AnthropicProtocol {
+    output_limit: tokio::sync::OnceCell<u64>,
+}
+impl AnthropicProtocol {
+    pub(super) fn new() -> Self {
+        Self {
+            output_limit: tokio::sync::OnceCell::new(),
+        }
+    }
+}
 impl ModelProtocol for AnthropicProtocol {
+    fn prepare_request<'a>(
+        &'a self,
+        http: &'a reqwest::Client,
+        cfg: &'a HarnessConfig,
+        history: &'a [Value],
+        tools: &'a ToolRegistry,
+    ) -> futures_util::future::BoxFuture<'a, Result<reqwest::RequestBuilder, String>> {
+        Box::pin(async move {
+            let mut resolved = cfg.clone();
+            if resolved.max_tokens.is_none() {
+                let limit = self
+                    .output_limit
+                    .get_or_try_init(|| super::anthropic_limits::discover(http, cfg))
+                    .await?;
+                resolved.max_tokens = Some(*limit);
+            }
+            Ok(self.request(http, &resolved, history, tools))
+        })
+    }
     fn image(&self, image: &crate::attachments::AttachmentImage) -> Value {
         json!({"type":"image","source":{"type":"base64","media_type":image.media_type,"data":image.data}})
     }
@@ -21,7 +49,14 @@ impl ModelProtocol for AnthropicProtocol {
         history: &[Value],
         tools: &ToolRegistry,
     ) -> reqwest::RequestBuilder {
-        http.post(format!("{}/messages",cfg.base)).json(&json!({"model":cfg.model,"system":cfg.system_prompt,"messages":history,"tools":self.tools(tools),"stream":true,"max_tokens":cfg.max_tokens})).header("x-api-key",&cfg.key).header("anthropic-version","2023-06-01")
+        let mut body = json!({"model":cfg.model,"system":cfg.system_prompt,"messages":history,"tools":self.tools(tools),"stream":true});
+        if let Some(limit) = cfg.max_tokens {
+            body["max_tokens"] = json!(limit);
+        }
+        http.post(format!("{}/messages", cfg.base))
+            .json(&body)
+            .header("x-api-key", &cfg.key)
+            .header("anthropic-version", "2023-06-01")
     }
     fn consume(
         &self,

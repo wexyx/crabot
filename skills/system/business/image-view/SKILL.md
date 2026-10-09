@@ -1,9 +1,11 @@
 ---
 name: image-view
-description: Show a generated local image to the user through a Web preview link.
+description: Show, display, preview or share a local image or screenshot in chat. Use when the user asks to see an image, view a screenshot, or get an image preview link. This publishes images; it does not perform OCR or inspect their pixels.
 ---
 
 # Show an image
+
+Find this capability using `find(query="image preview")` without a target, or `find(target="skill", id="image-view")` to load it directly. Use OCR or a vision-capable Agent instead when the user wants the image's contents analyzed.
 
 Load this Skill, then use `shell` to execute:
 

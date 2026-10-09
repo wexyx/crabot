@@ -8,6 +8,11 @@
 //! material per agent.
 
 mod commit_status;
+mod document_store;
+#[cfg(test)]
+mod document_tests;
+pub(crate) mod documents;
+pub(crate) use document_store::DocumentStore;
 mod graph;
 mod ingest;
 mod memory;

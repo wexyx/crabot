@@ -24,6 +24,15 @@ pub(in super::super) trait ModelProtocol: Send + Sync {
         history: &[Value],
         tools: &ToolRegistry,
     ) -> reqwest::RequestBuilder;
+    fn prepare_request<'a>(
+        &'a self,
+        http: &'a reqwest::Client,
+        config: &'a HarnessConfig,
+        history: &'a [Value],
+        tools: &'a ToolRegistry,
+    ) -> futures_util::future::BoxFuture<'a, Result<reqwest::RequestBuilder, String>> {
+        Box::pin(async move { Ok(self.request(http, config, history, tools)) })
+    }
     /// `delta` receives every fragment tagged by channel. Answer text becomes the reply;
     /// deliberation is folded into progress and must never join the answer.
     fn consume(

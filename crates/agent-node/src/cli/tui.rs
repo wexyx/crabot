@@ -33,6 +33,7 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
     let (actions_tx, mut actions_rx) = tokio::sync::mpsc::unbounded_channel();
     let (decisions_tx, mut decisions_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut submitting = false;
+    let mut submission_was_busy = false;
     let mut pending_echo: Option<String> = None;
     let mut submission: Option<tokio::task::JoinHandle<()>> = None;
     let mut decision_job: Option<tokio::task::JoinHandle<()>> = None;
@@ -70,7 +71,7 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                             if ctrl&&key.code==KeyCode::Char('p'){dialog.show();continue;}
                             // Tab completes an `@name` this group can be addressed by,
                             // before it falls through to slash-command completion.
-                            if key.code==KeyCode::Tab&&wizard.is_none()&&!dialog.visible() {
+                            if key.code==KeyCode::Tab&&wizard.is_none()&&!dialog.visible()&&!controller.private_input() {
                                 if let Some(fragment)=editor.mention_prefix()
                                     && let Some(name)=mentions.iter().find(|m|m.starts_with(fragment.as_str())).cloned()
                                     {editor.complete_mention(&name);continue;}
@@ -94,7 +95,7 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                                     if direction.is_some_and(|forward|config.move_choice(forward)){continue;}
                                 }
                             }
-                            if wizard.is_none() && editor.text().is_empty() {
+                            if wizard.is_none() && !controller.private_input() && editor.text().is_empty() {
                                 let direction=match key.code {KeyCode::Up|KeyCode::PageUp=>Some(false),KeyCode::Down|KeyCode::PageDown=>Some(true),_=>None};
                                 if direction.is_some_and(|forward|controller.move_chat_choice(forward)){continue;}
                             }
@@ -102,7 +103,8 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
 
                                 KeyCode::Char('l') if ctrl=>{transcript.clear();tools=Default::default();scroll=0;continue;},
                                 KeyCode::Esc|KeyCode::Char('c') if key.code==KeyCode::Esc||ctrl=>{
-                                    if wizard.take().is_some(){editor.clear();status="配置已取消，未保存。".into();}
+                                    if controller.cancel_process_input(){editor.clear();status="已取消进程输入。".into();}
+                                    else if wizard.take().is_some(){editor.clear();status="配置已取消，未保存。".into();}
                                     else if controller.cancel_chat_choice(){editor.clear();status="已取消选择聊天。".into();}
                                     else if busy {controller.interrupt().await?;status="正在打断…".into();}
                                     else if !editor.text().is_empty(){editor.clear();exit_armed=Some(Instant::now());status="输入已清空；再按 Ctrl+C 退出。".into();}
@@ -115,8 +117,14 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                                 },
                                 KeyCode::Char('d') if ctrl&&editor.text().is_empty()=>break,
                                 KeyCode::Enter if !key.modifiers.intersects(KeyModifiers::ALT|KeyModifiers::SHIFT)=>{
-                                    if wizard.is_none() && editor.complete_partial() { continue; }
-                                    let line=editor.submit(wizard.is_none());
+                                    if wizard.is_none() && !controller.private_input() && editor.complete_partial() { continue; }
+                                    if controller.private_input() && submitting {continue;}
+                                    let line=editor.submit(wizard.is_none()&&!controller.private_input());
+                                    if controller.private_input(){
+                                        let mut next=controller.clone();let tx=actions_tx.clone();submitting=true;status="正在向进程发送输入…".into();
+                                        submission=Some(tokio::spawn(async move{let result=next.execute(&line).await;let _=tx.send((next,result));}));
+                                        continue;
+                                    }
                                     if let Some(config)=wizard.as_mut() {
                                         if line.trim()=="/cancel" {wizard=None;status="配置已取消。".into();continue;}
                                         match config.submit(line).await {
@@ -135,16 +143,16 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                                     if line.trim().is_empty()&&!choosing_chat{continue;}
                                     if let Ok(super::commands::Command::Tools(index))=super::commands::parse(&line){transcript.push_str(&format!("\n{}\n",tools.details(index)));continue;}
                                     if submitting {editor.insert(&line);status="上一条请求正在提交，请稍候。".into();continue;}
-                                    if busy&&!choosing_chat&&!line.trim_start().starts_with('/') {editor.insert(&line);status="当前任务仍在运行，Esc 打断后可修改要求。".into();continue;}
                                     transcript.push_str(&format!("\n你：{line}\n"));scroll=0;
-                                    if !choosing_chat&&!line.trim_start().starts_with('/'){pending_echo=Some(line.clone());busy=true;started=Instant::now();}
+                                    submission_was_busy=busy;
+                                    if !choosing_chat&&!line.trim_start().starts_with('/'){pending_echo=Some(line.clone());if !busy{busy=true;started=Instant::now();}}
                                     status="正在提交…".into();submitting=true;
                                     _screen.draw(&controller.heading(),&transcript,&status,&session_info,&update_status.borrow().clone(),&editor,false,scroll,None,&tools)?;
                                     let mut next=controller.clone();let tx=actions_tx.clone();
                                     submission=Some(tokio::spawn(async move{let result=next.execute(&line).await;let _=tx.send((next,result));}));
 
                                 },
-                                _=>editor.key(key,wizard.is_some()),
+                                _=>editor.key(key,wizard.is_some()||controller.private_input()),
                             }
                         },
                         _=>{},
@@ -163,7 +171,7 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                             else if action.navigate {status=action.text;}
                             else {status="就绪".into();if !action.text.is_empty()&&!controller.choosing_chat(){transcript.push_str(&format!("{}\n",action.text));}}
                         },
-                        Err(e)=>{if pending_echo.take().is_some(){busy=false;}status="操作失败，可修改后重试。".into();transcript.push_str(&format!("\n错误：{e}\n"));},
+                        Err(e)=>{if pending_echo.take().is_some(){busy=submission_was_busy;}status="操作失败，可修改后重试。".into();transcript.push_str(&format!("\n错误：{e}\n"));},
                     }
                 },
                 Some(result)=decisions_rx.recv()=>{
@@ -195,7 +203,7 @@ pub(super) async fn run(manager: Arc<Manager>) -> Result<(), String> {
                 },
                 _=tick.tick()=>{
                     if dirty||busy {
-                        let secret=wizard.as_ref().is_some_and(|w|w.field().secret);
+                        let secret=controller.private_input()||wizard.as_ref().is_some_and(|w|w.field().secret);
                         let heading=wizard.as_ref().map(|w|w.prompt()).unwrap_or_else(||controller.heading());
                         let shown=if let Some(w)=wizard.as_ref(){w.prompt()}else if busy {let tool=tools.status((started.elapsed().as_secs()/2) as usize).map(|value|format!(" · {}",value.split_once(" · ").map(|(_,name)|name).unwrap_or(&value))).unwrap_or_default();format!("执行中 · {:>6.1}s · Esc 打断{}",started.elapsed().as_secs_f64(),tool)}else{status.clone()};
                         let update=update_status.borrow().clone();

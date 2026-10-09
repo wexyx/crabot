@@ -27,6 +27,9 @@ impl<'a> Run<'a> {
     ) -> Result<String, String> {
         loop {
             tokio::task::yield_now().await;
+            for content in crate::context::Guidance::drain() {
+                self.history.push(json!({"role":"user","content":content}));
+            }
             // Projected per turn so a tool revealed by `find` is offered by the
             // next request; the run executes against the full registry regardless.
             let exposed = self.tools.exposed(&self.session);
@@ -38,11 +41,20 @@ impl<'a> Run<'a> {
                 .next_turn(&self.history, &exposed, events)
                 .await?;
             if turn.calls().is_empty() {
+                if crate::context::Guidance::pending() {
+                    self.history
+                        .push(json!({"role":"assistant","content":turn.text()}));
+                    continue;
+                }
                 return Ok(turn.text().into());
             }
             let mut results = BTreeMap::new();
             for &index in turn.calls().keys() {
                 let (id, name) = turn.call(index)?;
+                if crate::context::Guidance::pending() {
+                    results.insert(index,"Tool not started: new user guidance arrived. Reassess the plan before executing.".into());
+                    continue;
+                }
                 let args: Value = serde_json::from_str(turn.arguments(index))
                     .map_err(|_| "invalid tool arguments JSON")?;
                 events(RuntimeEvent::ToolStarted {

@@ -15,6 +15,8 @@ impl Manager {
             json!({"type":"context.reset","content":"已开启新上下文，历史日志仍然保留。"}),
         )
         .await?;
+        agent_runtime::execution::ProcessSessions::global()
+            .stop_chat(&project.to_string(), "admin");
         Ok(json!({"message":"已开启新上下文，历史日志仍然保留。"}))
     }
 }

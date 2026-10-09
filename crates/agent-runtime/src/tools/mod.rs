@@ -1,6 +1,7 @@
 mod bridge;
 mod context;
 mod contract;
+mod doc;
 mod exposure;
 mod factory;
 mod find;

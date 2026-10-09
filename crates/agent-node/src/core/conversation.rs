@@ -133,6 +133,12 @@ pub(crate) async fn interrupt_session(state: &AppState, id: Uuid) -> Result<Valu
     if rows.iter().any(|r| r["local"] != true) {
         return Err("remote cancellation unsupported".to_string());
     }
+    for row in &rows {
+        if let Some(group) = row["group_id"].as_str() {
+            agent_runtime::execution::ProcessSessions::global()
+                .stop_chat(&project.to_string(), group);
+        }
+    }
     state
         .store
         .transaction(|data| {

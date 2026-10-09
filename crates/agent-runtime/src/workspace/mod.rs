@@ -3,6 +3,7 @@ mod approvals;
 mod settings;
 pub use access::{OutsideAccess, Workspace};
 pub(crate) use approvals::confirm_command;
+pub(crate) use approvals::confirm_process_input;
 pub use approvals::with_approval_context;
 pub use approvals::{ApprovalRequest, decide, pending};
 pub use settings::WorkspaceSettings;
