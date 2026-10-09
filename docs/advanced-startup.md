@@ -4,7 +4,7 @@
 
 ## 系统要求
 
-支持 macOS Apple Silicon / Intel、Linux x86_64 / ARM64。Linux 包基于 Ubuntu 22.04 和 GCC 13 构建，需要兼容 glibc、GCC 13 的 libstdc++ 运行库和 OpenSSL 3；仅有 Ubuntu 22.04 默认旧版 libstdc++ 的环境可能需要先更新运行库。Alpine/musl 与 Windows 暂无对应安装包。
+支持 macOS Apple Silicon / Intel、Linux x86_64 / ARM64。Linux 发布构建采用 glibc 2.28 基线，使用 Debian 10 自带的 glibc、libgcc 和 libstdc++ 即可启动；不要求另外安装新版 GCC 运行库。OpenSSL 静态编入程序，不依赖系统的 `libssl.so` / `libcrypto.so`，HTTPS 仍校验系统 CA 证书；精简系统需要安装 `ca-certificates`。发布流程检查主程序和全文索引扩展的 ABI 要求，并在干净 Debian 10 容器中验证启动。Alpine/musl 与 Windows 暂无对应安装包。
 
 Crabot 的本机执行不依赖额外隔离组件。Python、Codex、Claude CLI 按需另行安装；使用对应 CLI 助手前，需要完成其账号认证。
 
@@ -74,6 +74,7 @@ zsh 写入 `${ZDOTDIR:-$HOME}/.zshrc`；bash 写入 `.bashrc` 和生效的登录
 - 实例已运行：使用现有进程，或先退出，再启动；不要删除运行中的锁文件。
 - 工作目录与预期不同：检查显式参数、环境变量、两处 `.agent.env` 和项目自身设置。
 - 下载失败：确认正式 Release 与本机平台资产存在，安装器不会退回源码编译。
+- 旧版 v0.1.4.3 及之前的 Linux 包提示缺少 `libssl.so.3`：这些包仍依赖 OpenSSL 3 和较新的 glibc，旧系统应升级到包含兼容性修复的新版本。不要将 `libssl.so.1.1` 软链接成 `libssl.so.3`，也不要手动替换系统 glibc。
 
 备份与执行权限等高级功能见 [使用与配置](usage.md)。
 

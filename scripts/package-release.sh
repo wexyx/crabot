@@ -55,6 +55,10 @@ else
 fi
 [[ -s $fts_dest ]] || { echo 'Ladybug FTS extension is empty or missing.' >&2; exit 1; }
 chmod 644 "$fts_dest"
+if [[ $target == *-unknown-linux-gnu ]]; then
+  bash scripts/ci/check-linux-libraries.sh "$stage/crabot/libexec/agent-node"
+  bash scripts/ci/check-linux-libraries.sh "$fts_dest"
+fi
 archive="crabot-$target.tar.gz"
 tar -czf "dist/$archive" -C "$stage" crabot
 cd dist

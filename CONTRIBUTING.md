@@ -25,10 +25,12 @@ Rust 的 `mod.rs` / `lib.rs` 只负责模块声明和导出；接口、实现、
 
 LadybugDB 的本地绑定需要支持 C++20 `<format>` 和 `std::atomic_ref` 的工具链：
 
-- Linux 使用 GCC/G++ 13 或更新版本，并通过 `CC=gcc-13 CXX=g++-13` 选择编译器；Ubuntu 22.04 默认 GCC 11 不满足要求。Release 工作流从 `ubuntu-toolchain-r/test` PPA 安装 GCC/G++ 13。
+- Linux 源码编译使用 GCC/G++ 13 或更新版本，并通过 `CC` / `CXX` 选择编译器。OpenSSL 使用 vendored 静态构建，需要 Perl 和 Make。Release 在 `manylinux_2_28` 构建容器内使用新工具链、旧 glibc 基线，LadybugDB 同样从源码构建，避免上游预编译包引入更高的 ABI 要求；用户运行 Crabot 不需要容器。
 - macOS 使用 Xcode 16.3 或更新版本的 Clang/libc++；Xcode 15.4 虽然支持 `<format>`，但不支持 `std::atomic_ref`。Release 的 ARM / Intel 构建都使用 macOS 15 runner，并明确选择 Xcode 16.4。
 
-Release 工作流先编译并执行 `scripts/ci/cxx20-probe.cpp` 验证这两项能力，再构建 Rust。LadybugDB 预编译库的 `LBUG_VERSION` 从 `Cargo.lock` 读取，与打包的 FTS 扩展保持同版本，不跟随上游 `latest`；下载失败时依赖仍会回退到源码编译。
+Release 工作流先编译并执行 `scripts/ci/cxx20-probe.cpp` 验证这两项能力，再构建 Rust。macOS 使用的 LadybugDB 预编译库版本从 `Cargo.lock` 读取，与打包的 FTS 扩展保持同版本，不跟随上游 `latest`；下载失败时依赖仍会回退到源码编译。
+
+Linux 打包前通过 `scripts/ci/check-linux-libraries.sh` 检查主程序与 FTS 扩展：拒绝 OpenSSL 动态依赖、缺失库，以及超过 Debian 10 的 GLIBC 2.28 / GLIBCXX 3.4.25 / CXXABI 1.3.11 要求。随后在无网络的 Debian 10 容器中运行包内启动器，并检查扩展依赖。静态 OpenSSL 的安全更新需要更新 `Cargo.lock` 并重新发布程序，不能仅靠更新宿主机 OpenSSL。
 
 ```bash
 git clone https://github.com/wexyx/crabot.git

@@ -16,12 +16,14 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            cc: gcc-13
-            cxx: g++-13
+            image: quay.io/pypa/manylinux_2_28_x86_64
+            cc: gcc
+            cxx: g++
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            cc: gcc-13
-            cxx: g++-13
+            image: quay.io/pypa/manylinux_2_28_aarch64
+            cc: gcc
+            cxx: g++
           - os: macos-15
             target: aarch64-apple-darwin
             cc: clang
@@ -49,13 +51,8 @@ jobs:
           xcodebuild -version
           # Preserve the previous ARM build's deployment target on the newer SDK.
           echo 'MACOSX_DEPLOYMENT_TARGET=14.5' >> "$GITHUB_ENV"
-      - name: Install Linux C++20 toolchain
-        if: runner.os == 'Linux'
-        run: |
-          sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install --yes gcc-13 g++-13
       - name: Verify C++20 standard library
+        if: runner.os == 'macOS'
         run: |
           "$CXX" --version
           "$CXX" -std=c++20 scripts/ci/cxx20-probe.cpp -o "$RUNNER_TEMP/crabot-cxx20-probe"
@@ -63,13 +60,37 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node --test scripts/linux-libraries.test.mjs
       - run: npm install --global pnpm@10
-      - run: rustup update stable --no-self-update
+      - if: runner.os == 'macOS'
+        run: rustup update stable --no-self-update
       - run: pnpm install --frozen-lockfile && pnpm web:build
-      - run: cargo +stable build --release --locked -p agent-node
+      - name: Build Linux release on glibc 2.28
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e CRABOT_RELEASE_VERSION -e LBUG_VERSION \
+            '${{ matrix.image }}' bash scripts/ci/build-linux-release.sh '${{ matrix.target }}'
+      - name: Verify Linux package on Debian 10
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm --network none -v "$PWD/dist:/dist:ro" \
+            -e CRABOT_RELEASE_VERSION debian:buster-slim \
+            bash -eu -c '
+              tar -xzf "/dist/crabot-${{ matrix.target }}.tar.gz" -C /tmp
+              test "$(/tmp/crabot/bin/crabot --version)" = "Crabot $CRABOT_RELEASE_VERSION"
+              ldd /tmp/crabot/libexec/agent-node
+              dependencies=$(ldd /tmp/crabot/lib/lbug/fts/libfts.lbug_extension)
+              printf "%s\n" "$dependencies"
+              ! printf "%s\n" "$dependencies" | grep -E "not found|lib(ssl|crypto)\.so"
+            '
+      - if: runner.os == 'macOS'
+        run: cargo +stable build --release --locked -p agent-node
       - name: Verify embedded release version
+        if: runner.os == 'macOS'
         run: test "$(target/release/agent-node --version)" = "Crabot $CRABOT_RELEASE_VERSION"
-      - run: bash scripts/package-release.sh '${{ matrix.target }}'
+      - if: runner.os == 'macOS'
+        run: bash scripts/package-release.sh '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
         with:
           name: crabot-${{ matrix.target }}
