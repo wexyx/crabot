@@ -159,6 +159,107 @@ async fn web_lifecycle_does_not_own_agent_lifecycle() {
     wait(&m, p, id).await;
     assert_eq!(m.history(p, id).await.unwrap()["status"], "completed");
 }
+
+#[tokio::test]
+async fn remote_web_protects_management_assets_attachments_and_streams() {
+    let (manager, _) = fixture().await;
+    let token = "remote-web-integration-test-token-123456";
+    let access = crate::http::web_access::WebAccess::new(Some(token), "").unwrap();
+    let app =
+        crate::http::routes::router_with_manager(manager.core().state().clone(), manager, access);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let task = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    let client = reqwest::Client::new();
+    for path in [
+        "/",
+        "/assets/test.js",
+        "/v1/agent",
+        "/v1/repl",
+        "/v1/attachments/id/content",
+        "/v1/sessions/00000000-0000-0000-0000-000000000000/events",
+    ] {
+        let response = client
+            .get(format!("http://{address}{path}"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            reqwest::StatusCode::UNAUTHORIZED,
+            "{path}"
+        );
+        assert!(
+            response
+                .headers()
+                .get("www-authenticate")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .contains("Basic")
+        );
+    }
+    let url = format!("http://{address}/v1/agent");
+    assert!(
+        client
+            .get(&url)
+            .basic_auth("crabot", Some(token))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert!(
+        client
+            .get(&url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert_eq!(
+        client
+            .get(&url)
+            .basic_auth("crabot", Some("wrong"))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        client
+            .get(&url)
+            .basic_auth("crabot", Some(token))
+            .header("origin", "https://evil.example")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        reqwest::StatusCode::FORBIDDEN
+    );
+    assert!(
+        client
+            .get(format!("http://{address}/healthz"))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    task.abort();
+    let _ = task.await;
+}
 async fn wait(m: &Arc<Manager>, p: Uuid, id: Uuid) {
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {

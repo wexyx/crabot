@@ -24,6 +24,7 @@ test('SSE preserves split Unicode, CRLF and multiline JSON', () => {
 test('Switching Agent aborts pending work and does not leak credentials', async () => {
   let oldSignal, resolveOld
   const first = createAgentConnection('https://one.example', 'one-key', async (url, options) => {
+    assert.equal(options.headers.get('authorization'), 'Bearer one-key')
     assert.equal(url, 'https://one.example/v1/agent'); assert.equal(options.headers.get('x-admin-token'), null)
     oldSignal = options.signal
     return new Promise(resolve => { resolveOld = resolve })
@@ -35,12 +36,35 @@ test('Switching Agent aborts pending work and does not leak credentials', async 
   await assert.rejects(pending, { name: 'AbortError' })
   await assert.rejects(first.request('/v1/agent'), { name: 'AbortError' })
   const second = createAgentConnection('https://two.example', 'two-key', async (url, options) => {
+    assert.equal(options.headers.get('authorization'), 'Bearer two-key')
     assert.equal(url, 'https://two.example/v1/agent'); assert.equal(options.headers.get('x-admin-token'), null)
     assert.equal(options.credentials, 'omit'); assert.equal(options.redirect, 'error')
     return new Response('{"id":"two"}')
   })
   assert.deepEqual(await second.request('/v1/agent'), { id: 'two' })
   second.close()
+})
+
+test('same-origin API and SSE reuse browser authentication without storing the token', async () => {
+  const previous = globalThis.location
+  globalThis.location = {origin:'https://agent.example'}
+  try {
+    let calls=0
+    const connection=createAgentConnection('https://agent.example', undefined, async (_, options)=>{
+      calls++
+      assert.equal(options.credentials,'same-origin')
+      assert.equal(options.headers.get('authorization'),null)
+      if(options.headers.get('accept')==='text/event-stream') return new Response(new ReadableStream({start(c){c.close()}}), {headers:{'content-type':'text/event-stream'}})
+      return new Response('{}')
+    })
+    await connection.request('/v1/agent')
+    await connection.stream('/v1/sessions/id/events',()=>{},()=>{})
+    assert.equal(calls,2)
+    connection.close()
+  } finally {
+    if(previous===undefined) delete globalThis.location
+    else globalThis.location=previous
+  }
 })
 
 test('Closing a connection cancels its event stream', async () => {

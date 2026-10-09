@@ -34,12 +34,16 @@ export function createAgentConnection(base, secret, fetcher = globalThis.fetch) 
   async function fetchApi(path, options, signal) {
     if (!path.startsWith('/v1/')) throw new Error('Unsupported Agent API path')
     const headers = new Headers(options.headers)
-    const response = await fetcher(`${base}${path}`, { ...options, headers, signal, credentials: 'omit', redirect: 'error' })
+    if (secret) headers.set('authorization', `Bearer ${secret}`)
+    // Same-origin requests reuse browser HTTP authentication, including SSE.
+    // Never forward browser credentials to another Agent origin.
+    const credentials = new URL(base).origin === globalThis.location?.origin ? 'same-origin' : 'omit'
+    const response = await fetcher(`${base}${path}`, { ...options, headers, signal, credentials, redirect: 'error' })
     if (closed || signal.aborted) throw new DOMException('Agent connection closed', 'AbortError')
     if (!response.ok) {
       let detail=''
       try { detail=(await response.json()).error || '' } catch {}
-      throw new Error(`Agent 请求失败：${response.status}${response.status === 403 ? '，管理页面仅允许本机访问' : ''}${detail?' · '+String(detail).slice(0,1500):''}`)
+      throw new Error(`Agent 请求失败：${response.status}${response.status === 401 ? '，请刷新页面并使用 crabot / 访问口令登录' : response.status === 403 ? '，当前来源或访问方式不被允许' : ''}${detail?' · '+String(detail).slice(0,1500):''}`)
     }
     return response
   }

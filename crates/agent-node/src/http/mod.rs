@@ -12,6 +12,7 @@ pub(crate) mod server;
 pub(crate) mod sessions;
 pub(crate) mod skills;
 pub(crate) mod tools;
+pub(crate) mod web_access;
 pub(crate) mod web_settings;
 pub(crate) mod workspace;
 

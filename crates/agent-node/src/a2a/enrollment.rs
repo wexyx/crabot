@@ -1,20 +1,5 @@
 use crate::*;
 
-pub async fn guard(
-    request: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> Result<axum::response::Response, StatusCode> {
-    let peer = request
-        .extensions()
-        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-        .ok_or(StatusCode::FORBIDDEN)?;
-    if !peer.0.ip().is_loopback() {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    crate::http::local_access::check(request.headers())?;
-    Ok(next.run(request).await)
-}
-
 #[derive(Deserialize)]
 pub struct Registration {
     #[serde(default)]

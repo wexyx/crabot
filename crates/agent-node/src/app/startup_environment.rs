@@ -7,6 +7,7 @@ const KEYS: &[&str] = &[
     "CRABOT_DATA_DIR",
     "CRABOT_HISTORY_BUFFER_MIB",
     "BIND_ADDR",
+    "WEB_ACCESS_TOKEN",
     "AGENT_MODE",
     "AGENT_NAME",
     "AGENT_PROVIDER",

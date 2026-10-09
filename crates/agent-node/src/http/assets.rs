@@ -82,7 +82,10 @@ fn cors_for(origins: &str) -> CorsLayer {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers(["content-type".parse().unwrap()])
+        .allow_headers([
+            "content-type".parse().unwrap(),
+            "authorization".parse().unwrap(),
+        ])
 }
 
 pub fn proxy_mode() -> bool {

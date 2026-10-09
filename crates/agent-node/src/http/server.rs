@@ -19,6 +19,8 @@ impl WebServer {
         manager: Arc<Manager>,
         address: &str,
     ) -> Result<String, String> {
+        let access = super::web_access::WebAccess::from_env()?;
+        access.validate_bind(address.parse().map_err(|_| "invalid Server address")?)?;
         let mut running = self.running.lock().await;
         if let Some(current) = running.as_ref() {
             let requested = address
@@ -52,7 +54,8 @@ impl WebServer {
                 Ok(())
             })
             .await?;
-        let router = super::routes::router_with_manager(manager.core().state().clone(), manager);
+        let router =
+            super::routes::router_with_manager(manager.core().state().clone(), manager, access);
         let (stop, rx) = oneshot::channel();
         let task = tokio::spawn(async move {
             if let Err(error) = axum::serve(

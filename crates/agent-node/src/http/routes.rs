@@ -2,11 +2,20 @@ use crate::*;
 #[cfg(test)]
 pub(crate) fn router(state: AppState) -> Router {
     let manager = management::Manager::new(core::Core::new(state.clone()));
-    router_with_manager(state, manager).layer(axum::Extension(axum::extract::ConnectInfo(
+    router_with_manager(
+        state,
+        manager,
+        super::web_access::WebAccess::new(None, "").unwrap(),
+    )
+    .layer(axum::Extension(axum::extract::ConnectInfo(
         "127.0.0.1:1234".parse::<std::net::SocketAddr>().unwrap(),
     )))
 }
-pub(crate) fn router_with_manager(state: AppState, manager: Arc<management::Manager>) -> Router {
+pub(crate) fn router_with_manager(
+    state: AppState,
+    manager: Arc<management::Manager>,
+    access: super::web_access::WebAccess,
+) -> Router {
     // Human-facing transport: conversations, read models and explicit permissions only.
     let interaction = Router::new()
         .merge(crate::http::attachments::routes())
@@ -39,14 +48,14 @@ pub(crate) fn router_with_manager(state: AppState, manager: Arc<management::Mana
             "/v1/sessions/{id}/interrupt",
             post(session_handlers::interrupt),
         )
+        .route("/", get(web_config::index))
+        .route("/assets/{*path}", get(web_config::asset))
         .route_layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            enrollment::guard,
+            access,
+            super::web_access::guard,
         ));
     Router::new()
         .merge(interaction)
-        .route("/", get(web_config::index))
-        .route("/assets/{*path}", get(web_config::asset))
         .route("/healthz", get(|| async { Json(json!({"ok":true})) }))
         // A2A protocol is not a human management API.
         .route("/v1/client/register", post(enrollment::register))
