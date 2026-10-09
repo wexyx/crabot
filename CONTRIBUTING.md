@@ -23,7 +23,12 @@ Rust 的 `mod.rs` / `lib.rs` 只负责模块声明和导出；接口、实现、
 
 仅源码开发需要 Rust（支持 edition 2024）、Node.js 20+ 和 pnpm：
 
-LadybugDB 的本地绑定还需要支持 C++20 `<format>` 的工具链。Linux 使用 GCC/G++ 13 或更新版本，并通过 `CC=gcc-13 CXX=g++-13` 选择编译器；Ubuntu 22.04 默认 GCC 11 不满足要求。Release 工作流在 Ubuntu 22.04 上从 `ubuntu-toolchain-r/test` PPA 安装 GCC/G++ 13，先编译并执行 `scripts/ci/cxx20-probe.cpp` 再构建 Rust。macOS 使用 Xcode Command Line Tools 的 Clang/libc++。
+LadybugDB 的本地绑定需要支持 C++20 `<format>` 和 `std::atomic_ref` 的工具链：
+
+- Linux 使用 GCC/G++ 13 或更新版本，并通过 `CC=gcc-13 CXX=g++-13` 选择编译器；Ubuntu 22.04 默认 GCC 11 不满足要求。Release 工作流从 `ubuntu-toolchain-r/test` PPA 安装 GCC/G++ 13。
+- macOS 使用 Xcode 16.3 或更新版本的 Clang/libc++；Xcode 15.4 虽然支持 `<format>`，但不支持 `std::atomic_ref`。Release 的 ARM / Intel 构建都使用 macOS 15 runner，并明确选择 Xcode 16.4。
+
+Release 工作流先编译并执行 `scripts/ci/cxx20-probe.cpp` 验证这两项能力，再构建 Rust。LadybugDB 预编译库的 `LBUG_VERSION` 从 `Cargo.lock` 读取，与打包的 FTS 扩展保持同版本，不跟随上游 `latest`；下载失败时依赖仍会回退到源码编译。
 
 ```bash
 git clone https://github.com/wexyx/crabot.git
