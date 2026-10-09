@@ -56,6 +56,25 @@ fi
 [[ -s $fts_dest ]] || { echo 'Ladybug FTS extension is empty or missing.' >&2; exit 1; }
 chmod 644 "$fts_dest"
 if [[ $target == *-unknown-linux-gnu ]]; then
+  # GCC 13 headers are needed by lbug.hpp; don't require users to upgrade GCC.
+  for library in libstdc++.so.6 libgcc_s.so.1; do
+    source=$("${CXX:-g++}" -print-file-name="$library")
+    [[ $source == /* && -f $source ]] || { echo "Cannot locate $library" >&2; exit 1; }
+    cp -L "$source" "$stage/crabot/lib/$library"
+  done
+  gcc_version=$("${CXX:-g++}" -dumpfullversion)
+  [[ $gcc_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Cannot resolve GCC runtime license version.' >&2; exit 1; }
+  mkdir -p "$stage/crabot/licenses/gcc"
+  for license in COPYING3 COPYING.RUNTIME; do
+    curl --proto '=https' --tlsv1.2 -fsSL --retry 2 \
+      "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-$gcc_version/$license" \
+      -o "$stage/crabot/licenses/gcc/$license"
+  done
+  # Also resolve dependencies of dlopened FTS and the bundled C++ runtimes.
+  export LD_LIBRARY_PATH="$stage/crabot/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  for library in libstdc++.so.6 libgcc_s.so.1; do
+    bash scripts/ci/check-linux-libraries.sh "$stage/crabot/lib/$library"
+  done
   bash scripts/ci/check-linux-libraries.sh "$stage/crabot/libexec/agent-node"
   bash scripts/ci/check-linux-libraries.sh "$fts_dest"
 fi

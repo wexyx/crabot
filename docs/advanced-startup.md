@@ -4,7 +4,9 @@
 
 ## 系统要求
 
-支持 macOS Apple Silicon / Intel、Linux x86_64 / ARM64。Linux 发布构建采用 glibc 2.28 基线，使用 Debian 10 自带的 glibc、libgcc 和 libstdc++ 即可启动；不要求另外安装新版 GCC 运行库。OpenSSL 静态编入程序，不依赖系统的 `libssl.so` / `libcrypto.so`，HTTPS 仍校验系统 CA 证书；精简系统需要安装 `ca-certificates`。发布流程检查主程序和全文索引扩展的 ABI 要求，并在干净 Debian 10 容器中验证启动。Alpine/musl 与 Windows 暂无对应安装包。
+支持 macOS Apple Silicon / Intel、Linux x86_64 / ARM64。Linux 最低支持 Debian 12（glibc 2.36），不再支持 Debian 10/11。安装包携带 C++ 运行库，OpenSSL 使用系统版本；精简系统先执行 `sudo apt-get update && sudo apt-get install -y ca-certificates libssl3 libatomic1`。较新的 Debian 版本如果替换了包名，由发行版提供对应的 OpenSSL 3 运行库（如 `libssl3t64`）。安装脚本会在替换现有命令前检查缺失依赖并验证启动。其它发行版需具备兼容的 glibc 和 OpenSSL 3；Alpine/musl 与 Windows 暂无对应安装包。
+
+发布流程在 Debian 12 / GCC 13 镜像中编译，使用与 Cargo.lock 对齐的 Ladybug compat 预编译库。下载或链接检查失败会立即停止，不再回退到全量源码编译。产物在干净 Debian 12 容器中验证启动和动态依赖。
 
 Crabot 的本机执行不依赖额外隔离组件。Python、Codex、Claude CLI 按需另行安装；使用对应 CLI 助手前，需要完成其账号认证。
 

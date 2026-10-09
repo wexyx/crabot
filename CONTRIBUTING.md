@@ -25,16 +25,14 @@ Rust 的 `mod.rs` / `lib.rs` 只负责模块声明和导出；接口、实现、
 
 LadybugDB 的本地绑定需要支持 C++20 `<format>` 和 `std::atomic_ref` 的工具链：
 
-- Linux 源码编译使用 GCC/G++ 13 或更新版本，并通过 `CC` / `CXX` 选择编译器。OpenSSL 使用 vendored 静态构建，需要 Perl 和 Make。Release 在 `manylinux_2_28` 构建容器内使用新工具链、旧 glibc 基线，LadybugDB 同样从源码构建，避免上游预编译包引入更高的 ABI 要求；用户运行 Crabot 不需要容器。
+- Linux 源码编译使用 GCC/G++ 13 或更新版本，并通过 `CC` / `CXX` 选择编译器，需要系统 OpenSSL 3 开发包和 pkg-config。Release 使用官方 `gcc:13.5.0-bookworm`（Debian 12）镜像；用户运行 Crabot 不需要容器。
 - macOS 使用 Xcode 16.3 或更新版本的 Clang/libc++；Xcode 15.4 虽然支持 `<format>`，但不支持 `std::atomic_ref`。Release 的 ARM / Intel 构建都使用 macOS 15 runner，并明确选择 Xcode 16.4。
 
 Release 工作流先编译并执行 `scripts/ci/cxx20-probe.cpp` 验证这两项能力，再构建 Rust。macOS 使用的 LadybugDB 预编译库版本从 `Cargo.lock` 读取，与打包的 FTS 扩展保持同版本，不跟随上游 `latest`；下载失败时依赖仍会回退到源码编译。
 
-Linux 构建容器显式安装 `perl-core`、`perl-IPC-Cmd` 和 Make，固定使用 `/usr/bin/perl`，并在正式编译前对锁定版本的 OpenSSL `Configure` 执行 `perl -c`，提前检查完整模块加载链。
+Linux 通过 `scripts/ci/prepare-linux-lbug.sh` 下载锁定版本的 Ladybug compat 静态库和配套头文件，使用 `LBUG_LIBRARY_DIR` / `LBUG_INCLUDE_DIR` 显式传给 Rust 绑定。正式编译前先执行完整库链接预检，缺少产物立即失败，不回退源码构建。OpenSSL 直接使用 Debian 12 的动态库，不再构建 vendored OpenSSL。
 
-随后从 `Cargo.lock` 锁定的 `openssl-src` 构建静态 OpenSSL，统一提供给 `openssl-sys` 和 LadybugDB。`OPENSSL_NO_VENDOR=1` 仅在此 CI 流程中避免重复构建，配合 `OPENSSL_DIR` / `OPENSSL_STATIC=1` 使用准备好的静态库，不回退到系统动态库。CMake 工具链显式指定同一套头文件与 `.a` 库；正式编译前先运行 `scripts/ci/openssl-probe` 验证查找、链接及执行。
-
-Linux 打包前通过 `scripts/ci/check-linux-libraries.sh` 检查主程序与 FTS 扩展：拒绝 OpenSSL 动态依赖、缺失库，以及超过 Debian 10 的 GLIBC 2.28 / GLIBCXX 3.4.25 / CXXABI 1.3.11 要求。随后在无网络的 Debian 10 容器中运行包内启动器，并检查扩展依赖。静态 OpenSSL 的安全更新需要更新 `Cargo.lock` 并重新发布程序，不能仅靠更新宿主机 OpenSSL。
+包内携带构建工具链的 `libstdc++.so.6` 和 `libgcc_s.so.1`，主程序通过相对 RPATH 查找，避免要求用户安装 GCC 13。`scripts/ci/check-linux-libraries.sh` 检查主程序、C++ 运行库和 FTS 扩展的 GLIBC 要求不超过 2.36、无缺失依赖，允许系统 OpenSSL 3。随后在仅安装运行依赖的 Debian 12 容器中验证启动。OpenSSL 安全更新由系统包管理器提供；C++ 运行库更新随 Crabot 发布。
 
 ```bash
 git clone https://github.com/wexyx/crabot.git

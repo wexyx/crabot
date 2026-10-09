@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process'
 
 const checker = resolve('scripts/ci/check-linux-libraries.sh')
 
-async function inspect(output, status = 0, versions = 'GLIBC_2.28 GLIBCXX_3.4.25 CXXABI_1.3.11') {
+async function inspect(output, status = 0, versions = 'GLIBC_2.36 GLIBCXX_3.4.32 CXXABI_1.3.14') {
   const dir = await mkdtemp(join(tmpdir(), 'crabot-link-check-'))
   try {
     await writeFile(join(dir, 'ldd'), '#!/bin/sh\nprintf "%s\\n" "$LDD_OUTPUT"\nexit "$LDD_STATUS"\n', {mode: 0o755})
@@ -26,11 +26,18 @@ test('Linux release accepts resolved base system libraries', async () => {
   assert.equal(result.status, 0, result.stderr)
 })
 
-for (const library of ['libssl.so.3', 'libssl.so.1.1', 'libcrypto.so.3']) {
+for (const library of ['libssl.so.3', 'libcrypto.so.3']) {
+  test(`Linux release accepts resolved system ${library}`, async () => {
+    const result = await inspect(`${library} => /lib/${library}`)
+    assert.equal(result.status, 0, result.stderr)
+  })
+}
+
+for (const library of ['libssl.so.1.1', 'libcrypto.so.1.0', 'libssl.so.4']) {
   test(`Linux release rejects ${library} even when installed on CI`, async () => {
     const result = await inspect(`${library} => /lib/${library}`)
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /must not depend on shared OpenSSL/)
+    assert.match(result.stderr, /must use system OpenSSL 3/)
   })
 }
 
@@ -45,11 +52,11 @@ test('Linux release fails closed if ldd fails', async () => {
   assert.notEqual(result.status, 0)
 })
 
-for (const version of ['GLIBC_2.29', 'GLIBC_2.35', 'GLIBCXX_3.4.26', 'CXXABI_1.3.13']) {
+for (const version of ['GLIBC_2.37', 'GLIBC_2.38', 'GLIBC_2.40']) {
   test(`Linux release rejects runtime requirement ${version}`, async () => {
     const result = await inspect('libc.so.6 => /lib/libc.so.6', 0, version)
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /exceeding Debian 10 baseline/)
+    assert.match(result.stderr, /exceeding Debian 12 baseline/)
   })
 }
 

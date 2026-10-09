@@ -16,12 +16,12 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            image: quay.io/pypa/manylinux_2_28_x86_64
+            image: gcc:13.5.0-bookworm
             cc: gcc
             cxx: g++
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            image: quay.io/pypa/manylinux_2_28_aarch64
+            image: gcc:13.5.0-bookworm
             cc: gcc
             cxx: g++
           - os: macos-15
@@ -60,29 +60,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test scripts/linux-libraries.test.mjs scripts/static-openssl.test.mjs
+      - run: node --test scripts/linux-libraries.test.mjs scripts/linux-prebuilt.test.mjs scripts/linux-package.test.mjs scripts/install.test.mjs
       - run: npm install --global pnpm@10
       - if: runner.os == 'macOS'
         run: rustup update stable --no-self-update
       - run: pnpm install --frozen-lockfile && pnpm web:build
-      - name: Build Linux release on glibc 2.28
+      - name: Build Linux release for Debian 12+
         if: runner.os == 'Linux'
         run: |
           docker run --rm -v "$PWD:/work" -w /work \
             -e CRABOT_RELEASE_VERSION -e LBUG_VERSION \
             '${{ matrix.image }}' bash scripts/ci/build-linux-release.sh '${{ matrix.target }}'
-      - name: Verify Linux package on Debian 10
+      - name: Verify Linux package on Debian 12
         if: runner.os == 'Linux'
         run: |
-          docker run --rm --network none -v "$PWD/dist:/dist:ro" \
-            -e CRABOT_RELEASE_VERSION debian:buster-slim \
+          docker run --rm -v "$PWD/dist:/dist:ro" \
+            -e CRABOT_RELEASE_VERSION debian:bookworm-slim \
             bash -eu -c '
+              apt-get update
+              apt-get install -y --no-install-recommends ca-certificates libssl3 libatomic1
               tar -xzf "/dist/crabot-${{ matrix.target }}.tar.gz" -C /tmp
               test "$(/tmp/crabot/bin/crabot --version)" = "Crabot $CRABOT_RELEASE_VERSION"
-              ldd /tmp/crabot/libexec/agent-node
-              dependencies=$(ldd /tmp/crabot/lib/lbug/fts/libfts.lbug_extension)
-              printf "%s\n" "$dependencies"
-              ! printf "%s\n" "$dependencies" | grep -E "not found|lib(ssl|crypto)\.so"
+              for file in /tmp/crabot/libexec/agent-node /tmp/crabot/lib/*.so.* /tmp/crabot/lib/lbug/fts/libfts.lbug_extension; do
+                dependencies=$(LD_LIBRARY_PATH=/tmp/crabot/lib ldd "$file")
+                printf "%s\n" "$dependencies"
+                if printf "%s\n" "$dependencies" | grep -F "not found"; then
+                  exit 1
+                fi
+              done
             '
       - if: runner.os == 'macOS'
         run: cargo +stable build --release --locked -p agent-node

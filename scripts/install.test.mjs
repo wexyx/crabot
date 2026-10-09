@@ -7,7 +7,7 @@ import {execFileSync,spawnSync} from 'node:child_process'
 import {createHash} from 'node:crypto'
 
 const installer=resolve('install.sh')
-async function fixture(run){
+async function fixture(run, platform = {}){
   const root=await mkdtemp(join(tmpdir(),'crabot-install-'))
   try{
     const home=join(root,'home'),assets=join(root,'assets'),bin=join(root,'bin'),bundle=join(root,'bundle/crabot')
@@ -18,7 +18,11 @@ async function fixture(run){
     await writeFile(join(bundle,'web/index.html'),'fixture')
     await writeFile(join(bundle,'skills/system/management/management-guide/SKILL.md'),'fixture')
     await writeFile(join(bundle,'lib/lbug/fts/libfts.lbug_extension'),'fixture-extension')
-    const os=execFileSync('uname',['-s'],{encoding:'utf8'}).trim(),arch=execFileSync('uname',['-m'],{encoding:'utf8'}).trim()
+    const os=platform.os ?? execFileSync('uname',['-s'],{encoding:'utf8'}).trim(),arch=platform.arch ?? execFileSync('uname',['-m'],{encoding:'utf8'}).trim()
+    if (platform.os) await writeFile(join(bin,'uname'),`#!/bin/sh\ncase "$1" in -s) echo '${os}';; -m) echo '${arch}';; esac\n`,{mode:0o755})
+    // Executable fixtures are shell scripts, not ELF files. Simulate the loader
+    // independently of the host OS, including Linux-only installation failures.
+    await writeFile(join(bin,'ldd'),'#!/bin/sh\nprintf "%s\\n" "${FIXTURE_LDD_OUTPUT:-libssl.so.3 => /lib/libssl.so.3}"\nexit "${FIXTURE_LDD_STATUS:-0}"\n',{mode:0o755})
     const target=({'Darwin:arm64':'aarch64-apple-darwin','Darwin:x86_64':'x86_64-apple-darwin','Linux:x86_64':'x86_64-unknown-linux-gnu','Linux:aarch64':'aarch64-unknown-linux-gnu','Linux:arm64':'aarch64-unknown-linux-gnu'})[os+':'+arch]
     assert.ok(target,'Unsupported test platform')
     const archive=join(assets,`crabot-${target}.tar.gz`)
@@ -80,6 +84,25 @@ test('checksum failure does not create a command or change shell configuration',
   assert.doesNotMatch(result.stderr,/READY|\u001b/)
   assert.deepEqual(await readdir(home),[])
 }))
+
+test('Linux installer validates runtime before installing',async()=>fixture(async({env})=>{
+  const result=spawnSync('bash',[installer],{env,encoding:'utf8'})
+  assert.equal(result.status,0,result.stderr)
+  assert.match(result.stdout,/installed-fixture/)
+},{os:'Linux',arch:'x86_64'}))
+
+for (const [output,status] of [['libssl.so.3 => not found','0'],["libc.so.6: version GLIBC_2.36 not found",'1']]) {
+  test(`Linux dependency check preserves existing installation: ${output}`,async()=>fixture(async({home,prefix,env})=>{
+    await mkdir(join(prefix,'bin'),{recursive:true})
+    const existing=join(prefix,'bin/crabot')
+    await writeFile(existing,'previous installation')
+    const result=spawnSync('bash',[installer],{env:{...env,FIXTURE_LDD_OUTPUT:output,FIXTURE_LDD_STATUS:status},encoding:'utf8'})
+    assert.notEqual(result.status,0)
+    assert.match(result.stderr,/existing installation is unchanged/i)
+    assert.equal(await readFile(existing,'utf8'),'previous installation')
+    assert.ok(!(await readdir(home)).includes('.profile'))
+  },{os:'Linux',arch:'x86_64'}))
+}
 
 test('installer has readable stages without escape codes when piped or NO_COLOR is set',async()=>fixture(async({env})=>{
  for(const extra of [{TERM:'xterm-256color'},{TERM:'dumb',NO_COLOR:'1'}]){

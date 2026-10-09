@@ -2,43 +2,37 @@
 set -euo pipefail
 
 target=${1:?usage: build-linux-release.sh TARGET}
-# manylinux's minimal Perl installation is not a complete OpenSSL build runtime.
-# Install modules explicitly in this disposable CI container, never on user hosts.
-dnf install -y perl-core perl-IPC-Cmd make
-export PERL=/usr/bin/perl OPENSSL_SRC_PERL=/usr/bin/perl
-"$OPENSSL_SRC_PERL" -MIPC::Cmd -MFindBin -MFile::Compare -MFile::Copy -MText::ParseWords -e 'print "OpenSSL Perl modules: OK\n"'
+# Run in the official GCC 13 / Debian 12 image. No native dependency source build.
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends ca-certificates curl libssl-dev pkg-config patchelf
 export CC=gcc CXX=g++
-# Build all native code against this image's glibc, not a newer prebuilt library.
-export LBUG_BUILD_FROM_SOURCE=1
-# Bound native compilation memory on hosted runners.
-export CARGO_BUILD_JOBS=2 CMAKE_BUILD_PARALLEL_LEVEL=2
-# Rust and LadybugDB will use one static OpenSSL built below from locked sources.
-unset OPENSSL_DIR OPENSSL_ROOT_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR
+export CARGO_BUILD_JOBS=2
+unset LBUG_BUILD_FROM_SOURCE LBUG_RUST_BUILD_FROM_SOURCE LBUG_SHARED
+unset OPENSSL_DIR OPENSSL_ROOT_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR OPENSSL_STATIC
+unset CMAKE_TOOLCHAIN_FILE
+export OPENSSL_NO_VENDOR=1
 "$CXX" --version
-"$CXX" -std=c++20 scripts/ci/cxx20-probe.cpp -o /tmp/crabot-cxx20-probe
-/tmp/crabot-cxx20-probe
+pkg-config --modversion openssl
+
+# Download and link-check before Rust compilation; never silently fall back to
+# lbug's incomplete source archive if a release asset is missing.
+lbug_dir="$PWD/target/lbug-prebuilt"
+bash scripts/ci/prepare-linux-lbug.sh "$target" "${LBUG_VERSION:?LBUG_VERSION is required}" "$lbug_dir"
+export LBUG_LIBRARY_DIR="$lbug_dir" LBUG_INCLUDE_DIR="$lbug_dir"
+"$CXX" -std=c++20 -I "$lbug_dir" -include lbug.hpp scripts/ci/cxx20-probe.cpp \
+  -L "$lbug_dir" -Wl,--whole-archive -llbug -Wl,--no-whole-archive \
+  -lssl -lcrypto -latomic -ldl -pthread -o target/crabot-lbug-probe
+bash scripts/ci/check-linux-libraries.sh target/crabot-lbug-probe
+target/crabot-lbug-probe
 
 curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
 export PATH="$HOME/.cargo/bin:$PATH"
-cargo +stable fetch --locked --target "$target"
-# Compile-check the exact vendored Configure script, including its BEGIN imports,
-# before spending time compiling Rust and LadybugDB. No OpenSSL source is modified.
-openssl_configure=$(cargo +stable metadata --locked --offline --format-version 1 --filter-platform "$target" |
-  /opt/python/cp311-cp311/bin/python -c 'import json, pathlib, sys
-packages = [p for p in json.load(sys.stdin)["packages"] if p["name"] == "openssl-src"]
-if len(packages) != 1:
-    sys.exit("Expected exactly one locked openssl-src package")
-print(pathlib.Path(packages[0]["manifest_path"]).parent / "openssl" / "Configure")')
-"$OPENSSL_SRC_PERL" -c "$openssl_configure"
-export OPENSSL_DIR="$PWD/target/native-openssl/install"
-bash scripts/ci/build-static-openssl.sh "$target" "$openssl_configure" "$OPENSSL_DIR"
-export OPENSSL_ROOT_DIR="$OPENSSL_DIR" OPENSSL_STATIC=1 OPENSSL_NO_VENDOR=1
-export CMAKE_TOOLCHAIN_FILE="$PWD/scripts/ci/linux-release-toolchain.cmake"
-cmake -S scripts/ci/openssl-probe -B target/openssl-probe \
-  -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE"
-cmake --build target/openssl-probe --parallel 2
-target/openssl-probe/crabot-openssl-probe
-bash scripts/ci/check-linux-libraries.sh target/openssl-probe/crabot-openssl-probe
+# The package contains the compiler's C++ runtime, not a replacement system libc.
+export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-rpath,\$ORIGIN/../lib"
 cargo +stable build --release --locked -p agent-node
+# lbug's external-library mode also emits an absolute build-directory RPATH.
+# Replace it so the installed executable searches only its relocatable bundle.
+patchelf --set-rpath '$ORIGIN/../lib' target/release/agent-node
 bash scripts/ci/check-linux-libraries.sh target/release/agent-node
 bash scripts/package-release.sh "$target"

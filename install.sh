@@ -67,6 +67,20 @@ tar -tvzf "$stage/$archive" | awk 'substr($0,1,1)!="-" && substr($0,1,1)!="d" {b
 tar -xzf "$stage/$archive" -C "$stage"
 [[ -x $stage/crabot/bin/crabot && -x $stage/crabot/libexec/agent-node && -f $stage/crabot/web/index.html && -f $stage/crabot/skills/system/management/management-guide/SKILL.md && -s $stage/crabot/lib/lbug/fts/libfts.lbug_extension ]] || fail 'Incomplete release bundle.'
 note 'SHA-256 verified / archive paths checked'
+if [[ $target == *-unknown-linux-gnu ]]; then
+  command -v ldd >/dev/null || fail 'ldd is required. Linux releases require Debian 12+ (glibc 2.36+) and OpenSSL 3.'
+  for binary in "$stage/crabot/libexec/agent-node" "$stage/crabot/lib/lbug/fts/libfts.lbug_extension"; do
+    if ! dependencies=$(LD_LIBRARY_PATH="$stage/crabot/lib" ldd "$binary" 2>&1); then
+      printf '%s\n' "$dependencies" >&2
+      fail 'Cannot load this release. Debian 12+ (glibc 2.36+) is required; existing installation is unchanged.'
+    fi
+    if printf '%s\n' "$dependencies" | grep -Eq 'not found|version .* not found'; then
+      printf '%s\n' "$dependencies" >&2
+      fail 'Missing Linux runtime dependencies. On Debian 12 run: sudo apt-get update && sudo apt-get install -y ca-certificates libssl3 libatomic1. Existing installation is unchanged.'
+    fi
+  done
+  "$stage/crabot/bin/crabot" --version || fail 'Release startup check failed; existing installation is unchanged.'
+fi
 step 4 'Installing command'
 mkdir -p "$prefix/share/crabot/releases" "$prefix/bin"
 destination=$(mktemp -d "$prefix/share/crabot/releases/$version-$target.XXXXXX")
