@@ -16,6 +16,8 @@ pub use budget::ContextBudget;
 pub use contract::CompressionStrategy;
 pub use factory::CompressionFactory;
 mod documents;
+mod skill_library;
+pub use skill_library::{SkillAccess, SkillSource};
 mod guidance;
 pub use documents::{DocumentAccess, DocumentSource};
 pub use guidance::Guidance;

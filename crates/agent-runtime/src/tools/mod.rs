@@ -1,4 +1,5 @@
 mod bridge;
+mod capability_prompt;
 mod context;
 mod contract;
 mod doc;
@@ -6,6 +7,7 @@ mod exposure;
 mod factory;
 mod find;
 mod find_depth;
+mod skill;
 pub use agent_tool_macros::tool;
 pub use exposure::{DISCOVERY_TOOLS, ToolIndex};
 pub use find_depth::FindDepth;

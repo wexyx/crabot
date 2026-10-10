@@ -88,7 +88,16 @@ fn files(
 }
 
 fn read(root: &Path, scope: &str) -> Result<Vec<Resource>, String> {
-    let scope_dir = root.join(scope);
+    let mut result = read_scope(root, "shared", scope)?;
+    result.extend(read_scope(root, scope, scope)?);
+    if result.len() > 32 {
+        return Err("System Skills exceed 32 per scope".into());
+    }
+    Ok(result)
+}
+
+fn read_scope(root: &Path, directory: &str, scope: &str) -> Result<Vec<Resource>, String> {
+    let scope_dir = root.join(directory);
     let entries = match std::fs::read_dir(&scope_dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
@@ -157,8 +166,8 @@ mod tests {
     fn repository_skills_load_as_readonly_and_never_grant_python() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../skills/system");
         let rows = read(&root, "business").unwrap();
-        assert_eq!(rows.len(), 7);
-        for id in ["web-search", "coding"] {
+        assert_eq!(rows.len(), 9);
+        for id in ["web-search", "coding", "skill-creator", "memory"] {
             assert!(
                 rows.iter()
                     .any(|r| r.definition["id"] == id && r.definition["enabled"] == true)
@@ -169,10 +178,10 @@ mod tests {
             assert_eq!(row.definition["allow_python"], false);
             assert!(row.definition["files"]["SKILL.md"].is_string());
         }
-        assert_eq!(
-            read(&root, "management").unwrap()[0].id,
-            fallback_management_guide().id
-        );
+        let management = read(&root, "management").unwrap();
+        for id in ["management-guide", "skill-creator", "memory"] {
+            assert!(management.iter().any(|r| r.name() == id));
+        }
     }
     #[test]
     fn symlink_scripts_are_rejected() {

@@ -5,15 +5,15 @@ description: Show, display, preview or share a local image or screenshot in chat
 
 # Show an image
 
-Find this capability using `find(query="image preview")` without a target, or `find(target="skill", id="image-view")` to load it directly. Use OCR or a vision-capable Agent instead when the user wants the image's contents analyzed.
+This Skill is already loaded when present in ENABLED CAPABILITIES. Otherwise find it using `find(query="image preview")`, or load it with `find(target="skill",id="image-view")`. Use OCR or a vision-capable Agent instead when the user wants the image's contents analyzed.
 
-Load this Skill, then use `shell` to execute:
+Use `shell` to execute:
 
 ```sh
-python3 '<skills[0].directory returned by find>/show.py' "$CRABOT_TMP_DIR/path/to/image.png"
+python3 '<supplied Skill directory>/show.py' "$CRABOT_TMP_DIR/path/to/image.png"
 ```
 
-Use the actual `skills[0].directory` returned by `find(target=skill, id=image-view)`, not the placeholder above. The host injects a short-lived local service address and credential into the approved shell process. Do not print, persist or forward these credentials.
+Use this Skill's actual directory supplied by the host, or `skills[0].directory` from find if loaded on demand, not the placeholder above. The host injects a short-lived local service address and credential into the approved shell process. Do not print, persist or forward these credentials.
 
 Only images under the current workspace's `$CRABOT_TMP_DIR` are accepted. URLs, arbitrary host paths and symlinks escaping tmp are rejected. Do not fetch arbitrary URLs or copy private files just to bypass this boundary. The service does not fetch any network resource.
 

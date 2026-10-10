@@ -6,10 +6,8 @@ use std::{
 
 /// The entry points a model is always allowed to see.
 ///
-/// Everything else this node registered is hidden until `find` reveals it. Handing
-/// the model the whole registry up front spent the input budget on schemas for
-/// tools a given task never calls, and it grew with every capability binding an
-/// operator enabled.
+/// Built-ins registered by the factory are also visible immediately. External
+/// definitions remain discoverable so an unbounded user catalog is not inlined.
 pub const DISCOVERY_TOOLS: [&str; 1] = ["find"];
 
 /// Whether a name is always advertised, independent of what the model has unlocked.
@@ -77,7 +75,7 @@ mod tests {
         assert!(index.get("compact").is_some());
     }
     #[test]
-    fn find_is_the_only_advertised_entry_point() {
+    fn find_is_the_discovery_entry_point_independent_of_builtin_registration() {
         assert!(is_discovery("find"));
         assert!(!is_discovery("compact"));
         // The pre-merge names must not linger: a stale definition would advertise an

@@ -44,6 +44,7 @@ pub(crate) mod context_reset;
 
 mod permissions;
 
+mod discussion_schedule;
 mod member_events;
 mod member_response;
 mod prompt_configuration;

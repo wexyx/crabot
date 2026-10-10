@@ -273,9 +273,14 @@ pub(super) async fn execute(
         workspace
             .scope(async {
                 let catalog = if let Some(value) = command.data.get("skills") {
-                    agent_runtime::skills::SkillCatalog::new(
-                        serde_json::from_value(value.clone()).map_err(|e| e.to_string())?,
-                    )?
+                    crate::capabilities::Library::new(state.store.clone())
+                        .classify_skills(
+                            "business",
+                            agent_runtime::skills::SkillCatalog::new(
+                                serde_json::from_value(value.clone()).map_err(|e| e.to_string())?,
+                            )?,
+                        )
+                        .await?
                 } else {
                     skills::for_agent(state, credential.project_id, &credential.client_id).await?
                 };
@@ -323,9 +328,15 @@ pub(super) async fn execute(
                         Arc::new(crate::documents::Documents::new()),
                         agent_runtime::context::HistoryAccess::scope(
                             source,
-                            runtime.run_events(&prompt, &mut move |chunk| {
-                                let _ = tx.send(chunk);
-                            }),
+                            agent_runtime::context::SkillAccess::scope(
+                                Arc::new(crate::capabilities::SkillAuthoring::new(
+                                    state.store.clone(),
+                                    "business",
+                                )),
+                                runtime.run_events(&prompt, &mut move |chunk| {
+                                    let _ = tx.send(chunk);
+                                }),
+                            ),
                         ),
                     ),
                 )

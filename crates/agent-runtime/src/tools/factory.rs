@@ -22,7 +22,7 @@ impl ToolFactory {
                 continue;
             }
             if let Some(tool) = (registration.create)(context.clone()) {
-                registry.register(tool)?;
+                registry.register_builtin(tool)?;
             }
         }
         for definition in context.tool_policy.external() {
@@ -44,6 +44,7 @@ impl ToolFactory {
         // Published last: `find_tools` must describe the registry the model will
         // actually be offered, not the pre-policy set.
         context.tool_index().publish(registry.definitions());
+        registry.set_prompt(super::capability_prompt::CapabilityPrompt::new(context));
         Ok(registry)
     }
 }

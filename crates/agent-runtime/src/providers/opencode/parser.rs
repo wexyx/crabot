@@ -136,8 +136,15 @@ impl EventParser {
         // A call is often first seen already settled, so announcement and completion are
         // tracked separately: parts are republished and neither may fire twice.
         // `insert` is true only when the id was new, so each half fires exactly once.
-        if self.announced.insert(id.clone()) {
+        // A pending announcement may precede its arguments. Wait for actual input
+        // or a running/settled part so the single start event carries usable detail.
+        let ready = status != "pending"
+            || part["state"]["input"]
+                .as_object()
+                .is_some_and(|input| !input.is_empty());
+        if ready && self.announced.insert(id.clone()) {
             events(RuntimeEvent::ToolStarted {
+                arguments: part["state"]["input"].clone(),
                 id: id.clone(),
                 name,
             });
@@ -322,6 +329,23 @@ mod tests {
         let error = error.unwrap();
         assert!(!is_token_insufficient(&error), "{error}");
         assert!(error.contains("Insufficient account funds"));
+    }
+
+    #[test]
+    fn execute_announces_real_code_when_pending_arguments_arrive() {
+        let input = json!({"code":"const r = await tools.crabot_tool_find({ target: \"tool\", query: \"shell\" });"});
+        let mut parser = EventParser::default();
+        let mut events = vec![];
+        parser.consume(&json!({"type":"tool_use","part":{"id":"x","tool":"execute","state":{"status":"pending","input":{}}}}), &mut |e| events.push(e));
+        assert!(events.is_empty());
+        for status in ["running", "running", "completed"] {
+            parser.consume(&json!({"type":"tool_use","part":{"id":"x","tool":"execute","state":{"status":status,"input":input,"output":"ok"}}}), &mut |e| events.push(e));
+        }
+        assert_eq!(events.len(), 2);
+        assert!(
+            matches!(&events[0], RuntimeEvent::ToolStarted { name, arguments, .. } if name=="execute" && arguments==&input)
+        );
+        assert!(matches!(&events[1], RuntimeEvent::ToolFinished { .. }));
     }
 
     #[test]

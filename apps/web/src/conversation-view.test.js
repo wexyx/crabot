@@ -1,6 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {conversationView} from './conversation-view.js'
+import {compactProcessSummary} from './process-summary.js'
+
+test('legacy OpenCode execute history recovers code from its result without rewriting history',()=>{
+ const input={code:'const r = await tools.crabot_tool_find({ target: "tool", query: "shell" }); return JSON.stringify(r);'}
+ const events=[
+  {id:'event-one',seq:1,type:'agent.tool.started',agent:'peer',content:JSON.stringify({id:'call',name:'execute'})},
+  {id:'event-two',seq:2,type:'agent.tool.finished',agent:'peer',content:JSON.stringify({id:'call',output:JSON.stringify({name:'execute',input,status:'completed',output:'ok'})})},
+ ]
+ const before=JSON.stringify(events)
+ const row=conversationView(events)[0]
+ assert.equal(compactProcessSummary(row),'已完成 · execute · find · tool : "shell"')
+ assert.equal(JSON.stringify(events),before)
+})
 test('discussion yielding is a compact notice, not an assistant bubble',()=>{
  const events=[
   {seq:1,type:'agent.progress',agent:'reviewer',invocation_id:'r1'},

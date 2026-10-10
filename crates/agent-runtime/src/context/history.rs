@@ -9,6 +9,7 @@ pub struct HistoryQuery {
     /// Restrict the search to a single conversation; otherwise every conversation
     /// the host is willing to expose is searched.
     pub chat: Option<String>,
+    pub project: Option<String>,
     pub limit: usize,
 }
 /// What a host offers a run for recalling earlier material.
@@ -17,6 +18,21 @@ pub struct HistoryQuery {
 /// line range either over-read the log or missed the record; retrieval goes through
 /// the host's index, and the index ranks instead of guessing.
 pub trait HistorySource: Send + Sync {
+    fn read_project_range<'a>(
+        &'a self,
+        project: Option<&'a str>,
+        chat: Option<&'a str>,
+        after: u64,
+        before: u64,
+        limit: usize,
+    ) -> HistoryFuture<'a> {
+        if project.is_some() {
+            return Box::pin(async {
+                Err("This host does not support cross-project history reads".into())
+            });
+        }
+        self.read_range(chat, after, before, limit)
+    }
     /// Search recorded conversations. A host that keeps logs only per conversation
     /// leaves this at the default, which answers honestly instead of pretending.
     fn search<'a>(&'a self, _query: HistoryQuery) -> HistoryFuture<'a> {
@@ -61,6 +77,20 @@ impl HistoryAccess {
             .try_with(Arc::clone)
             .map_err(|_| "当前运行未绑定会话索引")?;
         source.search(query).await
+    }
+    pub async fn read_project_range(
+        project: Option<&str>,
+        chat: Option<&str>,
+        after: u64,
+        before: u64,
+        limit: usize,
+    ) -> Result<Value, String> {
+        let source = SOURCE
+            .try_with(Arc::clone)
+            .map_err(|_| "当前运行未绑定会话索引")?;
+        source
+            .read_project_range(project, chat, after, before, limit)
+            .await
     }
 
     /// Read history by sequence range, in sequential order.

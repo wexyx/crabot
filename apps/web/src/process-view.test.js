@@ -27,5 +27,5 @@ test('live status includes a concise action after the tool name',async()=>{
  const {compactProcessSummary}=await import('./process-summary.js')
  assert.equal(compactProcessSummary({type:'tool',name:'shell',input:JSON.stringify({command:'ls -la /long/private/path'}),pending:true}),'执行中 · shell · ls -la …/private/path')
  assert.equal(compactProcessSummary({type:'tool',name:'shell',input:JSON.stringify({command:'python3 script.py'}),pending:true}),'执行中 · shell · python3 script.py')
- assert.equal(compactProcessSummary({type:'tool',name:'find',input:JSON.stringify({target:'skill',id:'browser-automation'}),pending:true}),'执行中 · find · Skill · browser-automation')
+ assert.equal(compactProcessSummary({type:'tool',name:'find',input:JSON.stringify({target:'skill',id:'browser-automation'}),pending:true}),'执行中 · find · skill : "browser-automation"')
 })

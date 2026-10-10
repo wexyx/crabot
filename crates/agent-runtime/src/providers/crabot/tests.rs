@@ -185,7 +185,7 @@ async fn all_three_protocols_complete_twenty_tool_roundtrips() {
             assert!(
                 output
                     .iter()
-                    .any(|e| matches!(e,RuntimeEvent::ToolStarted{name,..} if name==tool_name))
+                    .any(|e| matches!(e,RuntimeEvent::ToolStarted{name,arguments:args,..} if name==tool_name && args==&serde_json::from_str::<Value>(arguments).unwrap()))
             );
             assert!(output.iter().any(|e|matches!(e,RuntimeEvent::ToolFinished{id,output} if id=="call1" && output.contains(expected))));
             assert_eq!(output.iter().filter(|e| e.is_terminal()).count(), 1);

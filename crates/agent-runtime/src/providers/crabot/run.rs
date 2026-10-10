@@ -60,6 +60,7 @@ impl<'a> Run<'a> {
                 events(RuntimeEvent::ToolStarted {
                     id: id.into(),
                     name: name.into(),
+                    arguments: args.clone(),
                 });
                 let result = self
                     .tools

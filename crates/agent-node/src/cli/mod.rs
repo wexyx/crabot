@@ -17,6 +17,7 @@ mod wordmark;
 pub(crate) use repl::run;
 mod markdown;
 mod permission_dialog;
+mod tool_code_preview;
 mod tool_summary;
 mod tool_timeline;
 mod workbench_commands;

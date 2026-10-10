@@ -5,7 +5,7 @@ description: Use Puppeteer and an isolated headless browser for web automation a
 
 # Browser automation
 
-Default to Node.js + Puppeteer, not the user's Chrome profile. Load this Skill with `find` with `target=skill` and `id=browser-automation`; its returned `skills[0].directory` contains `browser.mjs`, `runtime.mjs` and `install.mjs`. Use `shell` to inspect or execute these files. All browser behavior lives in this Skill, not in a dedicated browser tool. Crabot executes scripts on the host; shell approvals still apply.
+Default to Node.js + Puppeteer, not the user's Chrome profile. Use the directory supplied in ENABLED CAPABILITIES for this Skill; it contains `browser.mjs`, `runtime.mjs` and `install.mjs`. Only if the instructions/directory were not supplied, load them once with `find(target=skill,id=browser-automation)`. Use `shell` to inspect or execute these files. All browser behavior lives in this Skill, not in a dedicated browser tool. Crabot executes scripts on the host; shell approvals still apply.
 
 ## Install once
 
@@ -15,7 +15,7 @@ Dependencies are reused across requests, restarts and release upgrades. If Puppe
 
 ## Read a page or capture a screenshot
 
-Run `node "<skills[0].directory returned by find>/browser.mjs" "https://example.com" screenshot.png` through `shell` (use the actual directory). Omit the final argument for text only. The script saves screenshots under the workspace tmp directory and returns their actual paths. To show a screenshot to the user, discover and load the `image-view` Skill, execute its script, and include the returned Markdown reference. Workspace scripts should use `CRABOT_TMP_DIR` for generated artifacts rather than writing into the working directory root.
+Run `node "<supplied Skill directory>/browser.mjs" "https://example.com" screenshot.png` through `shell` (use the actual directory). Omit the final argument for text only. The script saves screenshots under the workspace tmp directory and returns their actual paths. To show a screenshot to the user, use the supplied `image-view` Skill (load it with find only if not already supplied), execute its script, and include the returned Markdown reference. Workspace scripts should use `CRABOT_TMP_DIR` for generated artifacts rather than writing into the working directory root.
 
 Only claim a screenshot exists after the command succeeds. A file path does not mean the model has viewed its contents.
 

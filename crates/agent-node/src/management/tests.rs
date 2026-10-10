@@ -76,7 +76,7 @@ async fn capability_packages_are_disjoint_and_skills_are_scoped() {
             .unwrap()
             .definitions()
             .len(),
-        2
+        4
     );
     assert_eq!(
         skills::catalog(m.core(), other)
@@ -84,7 +84,7 @@ async fn capability_packages_are_disjoint_and_skills_are_scoped() {
             .unwrap()
             .definitions()
             .len(),
-        1
+        3
     );
     assert!(
         crate::skills::snapshot(m.core().state(), p)

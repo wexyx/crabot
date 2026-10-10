@@ -15,6 +15,7 @@ pub(crate) struct IndexedHistory {
     chat: String,
     agent: Option<String>,
     snapshot: tokio::sync::OnceCell<knowledge::ContextSnapshot>,
+    instance: std::path::PathBuf,
 }
 impl IndexedHistory {
     pub(crate) fn new(project: Uuid, chat: String, agent: Option<String>) -> Self {
@@ -23,6 +24,7 @@ impl IndexedHistory {
             chat,
             agent,
             snapshot: tokio::sync::OnceCell::new(),
+            instance: agent_runtime::paths::data_dir(),
         }
     }
 
@@ -100,16 +102,34 @@ impl IndexedHistory {
 }
 
 impl HistorySource for IndexedHistory {
-    /// Searched across every conversation of this project, not just the current one,
-    /// which is the whole point of a history search.
+    /// Search across existing conversation indexes in this instance only.
     fn search<'a>(&'a self, query: HistoryQuery) -> HistoryFuture<'a> {
-        let project = self.project;
+        let instance = self.instance.clone();
         Box::pin(async move {
             tokio::task::spawn_blocking(move || {
-                let db = knowledge::for_project(project).ok_or("历史索引不可用")?;
-                let (hits, truncated) =
-                    knowledge::recall(&db, &query.query, query.chat.as_deref(), query.limit)?;
-                Ok(knowledge::render(&hits, truncated))
+                knowledge::HistorySearch::new(&instance).search(query)
+            })
+            .await
+            .map_err(|e| e.to_string())?
+        })
+    }
+    fn read_project_range<'a>(
+        &'a self,
+        project: Option<&'a str>,
+        chat: Option<&'a str>,
+        after: u64,
+        before: u64,
+        limit: usize,
+    ) -> HistoryFuture<'a> {
+        let Some(project) = project else {
+            return self.read_range(chat, after, before, limit);
+        };
+        let project = project.to_owned();
+        let chat = chat.unwrap_or_default().to_owned();
+        let instance = self.instance.clone();
+        Box::pin(async move {
+            tokio::task::spawn_blocking(move || {
+                knowledge::HistorySearch::new(&instance).read(&project, &chat, after, before, limit)
             })
             .await
             .map_err(|e| e.to_string())?

@@ -110,24 +110,66 @@ pub(super) async fn run(
     prompt: &str,
     dispatch: &Dispatch<'_>,
 ) -> Result<String, String> {
-    let mut discussion = Discussion::new(policy.members.iter().map(|m| m.path.join("/")));
+    use super::discussion_schedule::{DiscussionSchedule, Turn};
+    let owners = policy
+        .members
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| dispatch.addressed.is_empty() || dispatch.addressed.contains(&m.path))
+        .map(|(i, _)| i)
+        .collect::<Vec<_>>();
+    let mut discussion = Discussion::new(owners.iter().map(|i| policy.members[*i].path.join("/")));
+    let mut schedule = DiscussionSchedule::new(policy.members.len(), policy.rounds);
+    let roster = policy
+        .members
+        .iter()
+        .map(|m| format!("@{}: {}", m.path.join("/"), m.role))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let prompt = format!(
+        "{prompt}\nAvailable discussion peers (only these addresses may be consulted):\n{roster}\nTo ask a peer, start a plain-text line with @exact-address followed by one concrete question. The scheduler lets that peer answer next, then returns control to you. User-addressed members retain ownership; do not claim completion or consensus while a question is unanswered. Mentioning a name inside code, quotes or ordinary prose does not send a question."
+    );
     for round in 1..=policy.rounds {
-        for member in &policy.members {
-            let name = member.path.join("/");
-            let task = discussion.prompt(prompt, &name, &member.role, round)?;
-            let answer =
-                super::member_response::run(state, project, member, &task, dispatch).await?;
-            discussion.record(&name, &answer);
-            if discussion.concluded() || discussion.unclaimed() {
-                let notice = if discussion.unclaimed() {
-                    "本轮没有成员认领当前事项，请调整成员职责或补充任务要求。"
-                } else if discussion.yielded.is_empty() {
-                    "成员已达成共识，讨论结束。"
+        for owner in &owners {
+            let mut turn = Some(Turn {
+                member: *owner,
+                instruction: String::new(),
+                consultation: false,
+            });
+            while let Some(current) = turn {
+                let member = &policy.members[current.member];
+                let name = member.path.join("/");
+                let task = discussion.prompt(
+                    &format!("{prompt}\n{}", current.instruction),
+                    &name,
+                    &member.role,
+                    round,
+                )?;
+                let answer =
+                    super::member_response::run(state, project, member, &task, dispatch).await?;
+                if current.consultation {
+                    // A peer answer is evidence for the owner, not an automatic vote or
+                    // a change of responsibility. Keep it in the visible transcript.
+                    discussion.entries.push((name.clone(), answer.clone()));
                 } else {
-                    "相关成员已确认结论，其余成员已让出，讨论结束。"
-                };
-                let _ = dispatch.output.send(notice.into()).await;
-                return Ok(discussion.transcript());
+                    discussion.record(&name, &answer);
+                }
+                if let Err(notice) = schedule.consult(&current, &answer, &policy.members) {
+                    let _ = dispatch.output.send(notice.clone()).await;
+                    return Ok(format!("{}\n{notice}", discussion.transcript()));
+                }
+                if !schedule.pending() && (discussion.concluded() || discussion.unclaimed()) {
+                    let notice = if discussion.unclaimed() {
+                        "本轮没有成员认领当前事项，请调整成员职责或补充任务要求。"
+                    } else if discussion.yielded.is_empty() {
+                        "成员已达成共识，讨论结束。"
+                    } else {
+                        "相关成员已确认结论，其余成员已让出，讨论结束。"
+                    };
+                    let _ = dispatch.output.send(notice.into()).await;
+                    return Ok(discussion.transcript());
+                }
+                turn = schedule.next();
             }
         }
     }

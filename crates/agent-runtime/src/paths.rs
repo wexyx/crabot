@@ -20,3 +20,8 @@ pub fn workdir() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(user_home)
 }
+
+/// Durable assistant notes belong to the instance, not the user's home root.
+pub fn memory_file() -> PathBuf {
+    data_dir().join("work").join("memory.md")
+}

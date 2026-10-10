@@ -169,7 +169,7 @@ CLI 启动不自动打印历史，使用 `/history` 恢复。`/chat`（或 `/ses
 
 聊天记录写入按项目隔离的知识索引（`<数据目录>/knowledge/<project>/graph.db`），每条事件带序号与完整 payload，摘要节点按 `(chat, agent)` 隔离并标记其覆盖的记录；实例状态仍写入 `state.jsonl`，一行对应一次事务，仅包含变化的记录，不再在每次操作时重写整份 `state.json`。启动时回放日志，兼容旧 `state.json` 基线；旧文件请保留，不能单独删除。JSONL 中间损坏会拒绝启动，崩溃留下的未完成末行会恢复到最后一次完整提交。旧版本遗留的 `chats/` JSONL 目录不再读写，可自行清理。
 
-内置 Skill 源码在 `skills/system/{business,management}/<skill>/`，每个目录包含 `SKILL.md`、`skill.json`（描述和默认启用状态），可附带 `scripts/`、`references/`。`scripts/package-release.sh` 自动将其放入发布包 `skills/system`；`install.sh` 随程序复制到版本目录，启动器通过 `CRABOT_SYSTEM_SKILLS_DIR` 定位。也可显式指定这个环境变量覆盖来源。
+内置 Skill 源码在 `skills/system/{business,management,shared}/<skill>/`，`shared` 中的 Skill 同时提供给项目与管理 Agent，仍分别遵循各自启用范围。每个目录包含 `SKILL.md`、`skill.json`（描述和默认启用状态），可附带 `scripts/`、`references/`。`scripts/package-release.sh` 自动将其放入发布包 `skills/system`；`install.sh` 随程序复制到版本目录，启动器通过 `CRABOT_SYSTEM_SKILLS_DIR` 定位。也可显式指定这个环境变量覆盖来源。
 
 系统 Skill 在工具库中只读，可通过已有生效范围规则启用/禁用；安装升级不写入用户 Skill 或实例数据。内置依赖安装、浏览器自动化、OCR Skill 只提供按需工作流，不会在安装 Crabot 时自动安装 Homebrew、浏览器或 Tesseract，也不会绕过执行确认。
 
@@ -178,3 +178,21 @@ CLI 启动不自动打印历史，使用 `/history` 恢复。`/chat`（或 `/ses
 Skill 的运行依赖与源码分开保存。浏览器依赖统一位于 `<实例数据目录>/runtime/browser-automation/.runtime/`，`install.mjs` 和 `browser.mjs` 共用该目录。已有依赖跨重启和升级复用；Puppeteer 或匹配的浏览器缺失时自动进入构建流程，仍遵循当前执行授权。不会搜索或修改旧 release、源码仓库或 `~/.browser-skill` 中的依赖；Node.js 与 npm 需提前安装。
 
 每个用户 Skill 按“名称与标识 / 保存版本”分目录，保存后在状态日志中记录当前目录引用，不再把正文与脚本写入该条日志。这样保存失败不会覆盖上一版；旧版本文件保留用于恢复，删除 Skill 后不会继续加载它。推荐通过 Web 编辑，直接修改当前版本的文件也会在下次加载 Skill 时生效。旧版已存于日志的自建 Skill 仍兼容读取，下次保存时会写入实例目录。
+
+### 创建 Skill、记忆与默认能力
+
+内置 `skill-creator`（创建 Skill）可以通过 `skill` 工具列出、读取和保存用户 Skill，直接注册到当前实例的共享 Skill 库，而不是仅生成一个未注册的文件夹。新 Skill 默认停用，请在 Web 的 Skill 库中启用并选择生效范围；Agent 不能通过创建 Skill 自行扩大执行权限。项目 Agent 只能维护项目 Skill，管理 Agent 只能维护管理 Skill；修改已存在的 Skill 需要最新版本号。
+
+每次任务开始，已启用的内置工具 schema、内置 Skill 正文与脚本目录直接提供给模型，无需先调用 `find`。用户 Skill 先提供名称和描述，正文按需加载；外部命令仍可通过 `find` 发现。被禁用的能力不会因为预加载重新开放。
+
+`memory` Skill 用 `find(target=history,query="关键词")` 检索当前实例的不同聊天与项目。返回 `project`、`chat`、`seq`，可用同一工具指定这些坐标和序号范围读取原文。未提供查询词且未指定 project/chat 时，仍只读取当前聊天。存储和自动构建上下文保持按聊天、Agent 隔离；只有主动检索才跨聊天，不查询远程节点或其它实例。部分索引不可用时通过 `unavailable` 明确报告，不影响其它索引的结果。
+
+长期记忆文件统一为 `<实例目录>/work/memory.md`，默认 `~/.crabot/work/memory.md`，命名实例使用 `~/.crabot_<别名>/work/memory.md`；shell 提供 `CRABOT_MEMORY_FILE`。有需要时通过正常命令授权读写，不把聊天全文反复写入此文件。旧的 `~/memory.md` 不会被自动搬动或导入，以免混入其它程序的数据。
+
+Web 和 CLI 的实时工具状态包含简短参数，例如 `shell · python report.py`、`find · skill : "browser"`；OpenCode 的代码包装调用显示 `execute · find · tool : "shell"` 等内部操作，不把整段代码塞到状态行。内容过长截断，敏感命令参数遮盖，完整参数在详情中查看。进程会话操作显示「读取进程输出 / 发送进程输入 / 停止进程」，不把输入的密码或验证码放到状态行。
+
+### 讨论中的 Agent 协作
+
+讨论模式下，用户 `@A` 指定主责 Agent，不会把其它成员移出本轮可协作名单。A 可以另起一行用 `@B 具体问题` 请教群内成员；B 回答后，调度器让 A 继续处理原任务。B 也能继续请教其它成员，各条回复仍以独立 Agent 消息展示。
+
+协作不转移主责，也不会扩大任何 Agent 的执行权限。只有当前群成员可被调用，存在同名成员时使用完整路径（例如 `@node/b`）。代码块、引用、普通正文中的名字不触发协作。有待答问题时不宣告共识；重复追问与协作次数有上限，触限会明确提示尚有问题待处理。

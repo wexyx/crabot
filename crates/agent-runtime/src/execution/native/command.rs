@@ -90,6 +90,7 @@ impl NativeCommand {
             .env("TMPDIR", &scratch)
             .env("CRABOT_TMP_DIR", crate::workspace::temporary_dir(&root)?)
             .env("CRABOT_DATA_DIR", crate::paths::data_dir())
+            .env("CRABOT_MEMORY_FILE", crate::paths::memory_file())
             .env("MAC_CHROMIUM_TMPDIR", &scratch)
             .env("XDG_CONFIG_HOME", scratch.join("config"))
             .env("XDG_CACHE_HOME", scratch.join("cache"))

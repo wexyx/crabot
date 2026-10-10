@@ -11,7 +11,9 @@ export async function modelFixture(onRequest){
     const body=JSON.parse(text)
     onRequest?.(body)
     const prompt=body.messages.find(m=>m.role==='user')?.content || ''
-    const plan=JSON.parse(prompt.slice(prompt.lastIndexOf('TEST_PLAN:')+10))
+    let plan
+    try { plan=JSON.parse(prompt.slice(prompt.lastIndexOf('TEST_PLAN:')+10)) }
+    catch(error){res.writeHead(500);res.end('Fixture expected TEST_PLAN: '+prompt.slice(-3000));return}
     const index=body.messages.filter(m=>m.role==='tool').length
     const item=plan[index]
     const chunk=item?{choices:[{delta:{tool_calls:[{index:0,id:'call-'+index,type:'function',function:{name:item.name,arguments:JSON.stringify(item.input)}}]},finish_reason:'tool_calls'}]}:{choices:[{delta:{content:'Fixture complete'},finish_reason:'stop'}]}

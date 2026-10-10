@@ -51,6 +51,7 @@ impl Provider for ToolRuntime {
     fn execute<'a>(&'a self, prompt: &'a str, events: &'a mut EventSink<'_>) -> RuntimeFuture<'a> {
         Box::pin(async move {
             let task = format!("USER TASK AND CONVERSATION:\n{prompt}");
+            let capabilities = self.tools.capabilities().await?;
             let mut conversation = String::new();
             let mut session = ToolSession::default();
             let mut step = 0u64;
@@ -59,7 +60,10 @@ impl Provider for ToolRuntime {
                 // Rebuilt every turn on purpose. A tool that `find` revealed is
                 // only callable if the next request actually offers its schema, and a
                 // header built once would keep offering the model the locked set.
-                let base = format!("{}\n{task}", self.tools.instructions(&session));
+                let base = format!(
+                    "{}\n{capabilities}\n{task}",
+                    self.tools.instructions(&session)
+                );
                 let request = format!("{base}{conversation}");
                 if request.len() > 768 * 1024 {
                     return Err(
@@ -89,6 +93,7 @@ impl Provider for ToolRuntime {
                 events(RuntimeEvent::ToolStarted {
                     id: id.clone(),
                     name: call.request.name.clone(),
+                    arguments: serde_json::Value::Object(call.request.arguments.clone()),
                 });
                 let execution = self.tools.execute(&call.request, &mut session).await;
                 let outcome = match execution {
@@ -245,12 +250,10 @@ mod tests {
                 .any(|p| p.contains("Read before execution"))
         );
         assert!(prompts.iter().all(|p| p.contains("PROJECT TOOL SERVICE")));
-        // compact's *schema* is the thing under disclosure: a tool result may
-        // legitimately quote the name after the model asked for it, but the header
-        // must never offer it before discovery.
+        // Built-in schemas are supplied on the first request, user bodies are not.
         assert!(
-            !prompts[0].contains(r#""name":"compact""#),
-            "compact must stay hidden until find reveals it: {}",
+            prompts[0].contains(r#""name":"compact""#),
+            "built-in compact must be offered immediately: {}",
             prompts[0]
         );
     }
@@ -298,7 +301,10 @@ mod tests {
         let prompts = provider.prompts.lock().unwrap();
         assert_eq!(prompts.len(), 3, "one prompt per turn");
         let (first, second, third) = (&prompts[0], &prompts[1], &prompts[2]);
-        assert!(!first.contains("compact"), "hidden before discovery");
+        assert!(
+            first.contains("compact"),
+            "built-in available before discovery"
+        );
         assert!(second.contains("compact"), "revealed after discovery");
         assert!(third.contains("compact"), "stays revealed");
     }

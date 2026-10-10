@@ -1,10 +1,15 @@
 use super::{Tool, ToolDefinition, ToolSession};
 use serde_json::Value;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 /// Clone creates a registration snapshot, not a shared mutable global registry.
 #[derive(Clone, Default)]
 pub struct ToolRegistry {
     tools: BTreeMap<String, (ToolDefinition, Arc<dyn Tool>)>,
+    builtins: BTreeSet<String>,
+    prompt: Option<Arc<super::capability_prompt::CapabilityPrompt>>,
 }
 impl ToolRegistry {
     pub fn new() -> Self {
@@ -32,18 +37,35 @@ impl ToolRegistry {
         Ok(())
     }
     pub fn unregister(&mut self, name: &str) -> bool {
+        self.builtins.remove(name);
         self.tools.remove(name).is_some()
+    }
+    pub(crate) fn register_builtin(&mut self, tool: Arc<dyn Tool>) -> Result<(), String> {
+        let name = tool.definition().name().to_owned();
+        self.register(tool)?;
+        self.builtins.insert(name);
+        Ok(())
+    }
+    pub(crate) fn set_prompt(&mut self, prompt: super::capability_prompt::CapabilityPrompt) {
+        self.prompt = Some(Arc::new(prompt));
+    }
+    pub(crate) async fn instructions(&self) -> Result<String, String> {
+        match &self.prompt {
+            Some(prompt) => prompt.render().await,
+            None => Ok(String::new()),
+        }
     }
     pub fn definitions(&self) -> Vec<ToolDefinition> {
         self.tools.values().map(|(d, _)| d.clone()).collect()
     }
-    /// The definitions a model may see: the discovery entry points plus whatever it
-    /// has revealed through `find_tools` during this run.
+    /// Enabled built-ins are ready on the first turn. External tools are discoverable.
     pub fn advertised(&self, session: &ToolSession) -> Vec<ToolDefinition> {
         self.tools
             .values()
             .filter(|(d, _)| {
-                super::exposure::is_discovery(d.name()) || session.is_unlocked(d.name())
+                self.builtins.contains(d.name())
+                    || super::exposure::is_discovery(d.name())
+                    || session.is_unlocked(d.name())
             })
             .map(|(d, _)| d.clone())
             .collect()
@@ -61,10 +83,14 @@ impl ToolRegistry {
                 .tools
                 .iter()
                 .filter(|(name, _)| {
-                    super::exposure::is_discovery(name) || session.is_unlocked(name)
+                    self.builtins.contains(*name)
+                        || super::exposure::is_discovery(name)
+                        || session.is_unlocked(name)
                 })
                 .map(|(name, entry)| (name.clone(), entry.clone()))
                 .collect(),
+            builtins: self.builtins.clone(),
+            prompt: self.prompt.clone(),
         }
     }
     pub async fn execute(

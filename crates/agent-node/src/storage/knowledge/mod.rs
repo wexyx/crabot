@@ -14,13 +14,15 @@ mod document_tests;
 pub(crate) mod documents;
 pub(crate) use document_store::DocumentStore;
 mod graph;
+mod history_search;
+pub(crate) use history_search::HistorySearch;
 mod ingest;
 mod memory;
 mod recall;
 
 pub(crate) use graph::for_project;
 pub(crate) use ingest::{persist, write_summary};
-pub(crate) use recall::{Hit, latest_seq, recall, recall_range, render};
+pub(crate) use recall::{Hit, latest_seq, recall_range};
 
 mod snapshot;
 pub(crate) use snapshot::{ContextSnapshot, context_snapshot};

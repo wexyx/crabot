@@ -29,12 +29,21 @@ pub fn find(content: &str, members: &[Member]) -> Vec<Mention> {
         let wanted = token.to_ascii_lowercase();
         // Both the bare leaf id and the full path resolve, because a member may be
         // mounted at `node/agent` while the writer usually knows only the leaf.
-        let Some(member) = members.iter().find(|member| {
-            member
-                .path
+        let exact = members
+            .iter()
+            .find(|m| m.path.join("/").eq_ignore_ascii_case(&wanted));
+        let mut aliases = members.iter().filter(|m| {
+            m.path
                 .last()
                 .is_some_and(|leaf| leaf.eq_ignore_ascii_case(&wanted))
-                || member.path.join("/").eq_ignore_ascii_case(&wanted)
+        });
+        let first = aliases.next();
+        let Some(member) = exact.or_else(|| {
+            if aliases.next().is_none() {
+                first
+            } else {
+                None
+            }
         }) else {
             continue;
         };
@@ -67,7 +76,7 @@ fn tokens(content: &str) -> Vec<&str> {
         if bounded && !token.is_empty() && token.len() <= MAX_TOKEN {
             tokens.push(token);
         }
-        index = start + 1 + token.len().max(1);
+        index = start + 1 + token.len();
         if index >= content.len() {
             break;
         }
@@ -122,8 +131,13 @@ pub fn narrow(policy: &Policy, paths: &[Vec<String>]) -> Option<Result<Policy, S
                     .join("、@")
             ));
         }
+        // A discussion mention selects owners, not an isolated miniature group.
+        // Keep the roster so an owner can consult peers during the same task.
+        if policy.mode == Mode::A2a {
+            return Ok(policy.clone());
+        }
         if narrowed.members.len() == 1 {
-            // Relay and A2A need more than one participant to negotiate over, and PMO
+            // Relay needs more than one participant to negotiate over, and PMO
             // needs a leader; a single addressed member is a direct conversation.
             narrowed.mode = Mode::Chat;
             narrowed.leader = None;
@@ -149,7 +163,7 @@ pub fn note(paths: &[Vec<String>]) -> String {
         return String::new();
     }
     format!(
-        "You were addressed directly by the human this turn (@{}); other group members did not receive this request.",
+        "The human assigned this turn to @{}. These members own the task. In discussion mode they may consult other roster members; consultation does not transfer ownership or grant permissions.",
         paths
             .iter()
             .map(|p| p.join("/"))
@@ -266,7 +280,11 @@ mod tests {
                 .iter()
                 .map(|m| m.path.join("/"))
                 .collect::<Vec<_>>(),
-            vec!["alice".to_string(), "carol".to_string()]
+            vec![
+                "alice".to_string(),
+                "node/bob".to_string(),
+                "carol".to_string()
+            ]
         );
     }
     #[test]

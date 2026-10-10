@@ -19,6 +19,12 @@ impl Engine {
         events: &mut (impl FnMut(RuntimeEvent) + Send),
     ) -> Result<String, String> {
         let client = self.client.for_run()?;
-        Run::new(&client, &self.tools, prompt).execute(events).await
+        let prompt = format!(
+            "{}\nUSER TASK AND CONVERSATION:\n{prompt}",
+            self.tools.instructions().await?
+        );
+        Run::new(&client, &self.tools, &prompt)
+            .execute(events)
+            .await
     }
 }

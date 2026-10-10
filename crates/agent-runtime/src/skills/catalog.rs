@@ -1,9 +1,10 @@
 use super::SkillDefinition;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Default)]
 pub struct SkillCatalog {
     skills: BTreeMap<String, SkillDefinition>,
+    builtins: BTreeSet<String>,
 }
 impl SkillCatalog {
     pub fn new(skills: Vec<SkillDefinition>) -> Result<Self, String> {
@@ -29,6 +30,17 @@ impl SkillCatalog {
     }
     pub fn definitions(&self) -> Vec<SkillDefinition> {
         self.skills.values().cloned().collect()
+    }
+    /// Origin is host metadata, never a field a user package can set.
+    pub fn with_builtins(mut self, ids: impl IntoIterator<Item = String>) -> Self {
+        self.builtins = ids
+            .into_iter()
+            .filter(|id| self.skills.contains_key(id))
+            .collect();
+        self
+    }
+    pub(crate) fn is_builtin(&self, id: &str) -> bool {
+        self.builtins.contains(id)
     }
     pub(crate) fn get(&self, id: &str) -> Result<&SkillDefinition, String> {
         self.skills

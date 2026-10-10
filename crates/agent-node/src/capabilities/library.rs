@@ -96,14 +96,41 @@ impl Library {
     }
     pub async fn skills(&self, scope: &str, context: &Context) -> Result<SkillCatalog, String> {
         let mut definitions = vec![];
+        let mut builtins = vec![];
         for item in self.resources(scope, "skill").await? {
             if context.resolve(&self.store, &item, None).await?["enabled"] == true {
+                if item.readonly {
+                    builtins.push(item.name().to_owned());
+                }
                 let mut definition = item.definition;
                 definition["enabled"] = json!(true);
                 definitions.push(serde_json::from_value(definition).map_err(|e| e.to_string())?);
             }
         }
-        SkillCatalog::new(definitions)
+        Ok(SkillCatalog::new(definitions)?.with_builtins(builtins))
+    }
+    /// Execution snapshots keep their frozen enablement. Recognize a built-in only
+    /// when its content matches the local installed definition, not by name alone.
+    pub(crate) async fn classify_skills(
+        &self,
+        scope: &str,
+        catalog: SkillCatalog,
+    ) -> Result<SkillCatalog, String> {
+        let installed = self.resources(scope, "skill").await?;
+        let builtins = catalog
+            .definitions()
+            .into_iter()
+            .filter(|skill| {
+                installed.iter().any(|r| {
+                    r.readonly
+                        && r.name() == skill.id()
+                        && r.definition["files"] == json!(skill.files())
+                        && r.definition["description"] == skill.description()
+                })
+            })
+            .map(|s| s.id().to_owned())
+            .collect::<Vec<_>>();
+        Ok(catalog.with_builtins(builtins))
     }
     pub async fn tool_policy(&self, scope: &str, context: &Context) -> Result<ToolPolicy, String> {
         let legacy = self

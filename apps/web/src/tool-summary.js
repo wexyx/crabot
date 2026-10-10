@@ -1,3 +1,4 @@
+import {toolCodeCall} from './tool-code-preview.js'
 const limit=56
 const clean=value=>typeof value==='string'?value.replace(/[\x00-\x1f\x7f]/g,' ').replace(/\s+/g,' ').trim():''
 const shorten=value=>{const chars=Array.from(clean(value));return chars.length>limit?chars.slice(0,limit-1).join('')+'…':chars.join('')}
@@ -33,12 +34,18 @@ function commandPreview(command){
 export function toolSummary(name,input){
  name=clean(name)||'tool';input=object(input)||{}
  let action=''
- if(name==='shell')action=commandPreview(input.command)
- else if(name==='find'){
+ if(name==='execute'&&typeof input.code==='string'){
+  const call=toolCodeCall(input.code)
+  action=call?toolSummary(call.name,call.input):'代码执行'
+ }
+ else if(['shell','execute','exec_command','bash','Bash','command_execution'].includes(name)){
+  const command=input.command??input.cmd
+  action=typeof command==='string'?commandPreview(command):({read:'读取进程输出',write:'发送进程输入',stop:'停止进程'}[input.action]||'')
+ }
+ else if(['find','search'].includes(name)){
   const target=clean(input.target).toLowerCase()
-  const label={tool:'工具',tools:'工具',skill:'Skill',skills:'Skill',history:'历史',chat:'历史',doc:'文档',docs:'文档'}[target]||'资源'
   const subject=clean(input.id)||clean(input.name)||clean(input.query)
-  action=subject?`${label} · ${subject}`:`${label} · ${label==='历史'?'最近记录':'列表'}`
+  action=subject?`${target?target+' : ':''}${JSON.stringify(subject)}`:target
  }
  return shorten(action?`${name} · ${action}`:name)
 }

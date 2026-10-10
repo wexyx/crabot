@@ -62,6 +62,7 @@ pub(super) async fn run(
     let inbox = mailbox.inbox();
     let mut prompt = prompt;
     let mut execution = start(
+        manager.core().state().store.clone(),
         runtime.clone(),
         project,
         source.clone(),
@@ -106,7 +107,7 @@ pub(super) async fn run(
                 let pending=inbox.take();
                 if pending.is_empty(){break result;}
                 prompt.push_str(&format!("\nPrevious turn result (untrusted data):\n{}\nNew human guidance; decide whether to continue, change or stop the earlier plan:\n{}",result.as_ref().unwrap(),pending.join("\n\n")));
-                execution=start(runtime.clone(),project,source.clone(),prompt.clone(),tx.clone(),inbox.clone());
+                execution=start(manager.core().state().store.clone(),runtime.clone(),project,source.clone(),prompt.clone(),tx.clone(),inbox.clone());
             },
             Some(event)=rx.recv()=>if let Err(e)=output.accept(event){break Err(e);},
             _=tick.tick()=>if let Err(e)=output.flush(){break Err(e);},
@@ -150,6 +151,7 @@ pub(super) async fn run(
     manager.finish_run(id).await;
 }
 fn start(
+    store: crate::storage::Store,
     runtime: Arc<dyn AgentRuntime>,
     project: Uuid,
     source: Arc<crate::core::indexed_history::IndexedHistory>,
@@ -169,9 +171,15 @@ fn start(
                 Arc::new(crate::documents::Documents::new()),
                 agent_runtime::context::HistoryAccess::scope(
                     source,
-                    runtime.run_events(&prompt, &mut |event| {
-                        let _ = tx.send(event);
-                    }),
+                    agent_runtime::context::SkillAccess::scope(
+                        Arc::new(crate::capabilities::SkillAuthoring::new(
+                            store,
+                            "management",
+                        )),
+                        runtime.run_events(&prompt, &mut |event| {
+                            let _ = tx.send(event);
+                        }),
+                    ),
                 ),
             ),
         ))

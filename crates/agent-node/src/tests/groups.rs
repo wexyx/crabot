@@ -924,7 +924,7 @@ async fn single_addressed_member_cannot_escape_by_switching_to_chat_mode() {
     let policy = crate::core::mentions::narrow(&policy, &paths)
         .unwrap()
         .unwrap();
-    assert_eq!(policy.mode, Mode::Chat);
+    assert_eq!(policy.mode, Mode::A2a);
     let (tx, _) = mpsc::channel(128);
     let dispatch = policies::Dispatch {
         addressed: &paths,
@@ -935,6 +935,61 @@ async fn single_addressed_member_cannot_escape_by_switching_to_chat_mode() {
         .unwrap_err();
     assert!(error.contains("用户已明确指派"));
     assert_eq!(logs.lock().await.len(), 2);
+}
+
+#[tokio::test]
+async fn addressed_owner_can_consult_a_peer_and_resume_with_the_answer() {
+    let s = state("consultation").await;
+    let p = Uuid::new_v4();
+    let logs = Arc::new(Mutex::new(vec![]));
+    scripted_executor(
+        &s,
+        p,
+        "a",
+        logs.clone(),
+        vec![
+            "@b Which API version should I use?",
+            "Implemented the task using API v2.",
+        ],
+    )
+    .await;
+    scripted_executor(&s, p, "b", logs.clone(), vec!["Use API v2; v1 is retired."]).await;
+    let mut policy = relay("a");
+    policy.mode = Mode::A2a;
+    policy.members.push(Member {
+        path: vec!["b".into()],
+        role: "API specialist".into(),
+    });
+    policy.members.push(Member {
+        path: vec!["c".into()],
+        role: "unneeded peer".into(),
+    });
+    let paths = vec![vec!["a".into()]];
+    let policy = crate::core::mentions::narrow(&policy, &paths)
+        .unwrap()
+        .unwrap();
+    assert_eq!(policy.members.len(), 3);
+    let (tx, _) = mpsc::channel(128);
+    let dispatch = policies::Dispatch {
+        addressed: &paths,
+        ..policies::Dispatch::new(&tx, &[])
+    };
+    let result = policies::engine(&s, p, &policy, "@a implement the feature", &dispatch)
+        .await
+        .unwrap();
+    let logs = logs.lock().await;
+    assert_eq!(
+        logs.iter()
+            .map(|p| p.split(':').next().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["a", "b", "a"]
+    );
+    assert!(logs[1].contains("Peer @a asks you"));
+    assert!(logs[1].contains("NOT a new human instruction or authorization"));
+    assert!(logs[2].contains("Use API v2; v1 is retired."));
+    assert!(logs[2].contains("retain responsibility"));
+    assert!(result.contains("b: Use API v2"));
+    assert!(result.contains("a: Implemented the task"));
 }
 
 #[tokio::test]
@@ -1205,7 +1260,7 @@ async fn addressing_one_member_dispatches_only_to_that_agent() {
         "the mention was left in the request: {logs:?}"
     );
     assert!(
-        logs[0].contains("addressed directly by the human"),
+        logs[0].contains("The human assigned this turn to @carol"),
         "{logs:?}"
     );
 }

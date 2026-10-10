@@ -22,6 +22,6 @@ test('both management and group event envelopes expose tool arguments',()=>{
   {name:'find',input},
   {content:JSON.stringify({name:'find',arguments:input})},
   {payload:{content:JSON.stringify({name:'find',input})}},
- ])assert.equal(toolEventSummary(row),'find · Skill · browser-automation')
+ ])assert.equal(toolEventSummary(row),'find · skill : "browser-automation"')
  assert.equal(toolEventSummary({content:'invalid'}),'tool')
 })

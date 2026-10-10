@@ -62,15 +62,21 @@ export function conversationView(events) {
       let name=event.name
       if(!name){try{name=JSON.parse(text).name}catch{}}
       let data=event
-      try{if(text)data={...JSON.parse(text),...event}}catch{}
+      try{if(text)data={...event,...JSON.parse(text)}}catch{}
       const tool={seq:event.seq,type:'tool',timestamp,id:data.call_id??data.id,agent:speaker,invocation_id:event.invocation_id,name:name||data.name||'tool',text:'',input:stringify(data.input??data.arguments),label:name||data.name||'工具调用',pending:true}
       tools.push(tool);rows.push(tool)
     }else if(type==='tool_finished'||type==='agent.tool.finished'){
       let data=event
-      try{if(text)data={...JSON.parse(text),...event}}catch{}
+      try{if(text)data={...event,...JSON.parse(text)}}catch{}
       const id=data.call_id??data.id
       const tool=tools.find(t=>t.pending&&t.agent===speaker&&t.invocation_id===event.invocation_id&&(id?t.id===id:true))
-      if(tool){tool.text=stringify(data.output??text);tool.pending=false}
+      if(tool){
+        tool.text=stringify(data.output??text);tool.pending=false
+        // Older OpenCode started events omitted input; its result retains it.
+        if(!tool.input||tool.input==='null'||tool.input==='{}'){
+          try{const result=typeof data.output==='string'?JSON.parse(data.output):data.output;if(result?.input)tool.input=stringify(result.input)}catch{}
+        }
+      }
       else rows.push({seq:event.seq,type:'tool',timestamp,text:stringify(data.output??text),label:'工具结果',pending:false})
     }else{
       answer=null

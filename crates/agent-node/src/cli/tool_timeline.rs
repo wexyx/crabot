@@ -85,6 +85,13 @@ impl ToolTimeline {
                         .or_else(|| data.get("content"))
                         .unwrap_or(data),
                 );
+                if matches!(entry.input.as_str(), "null" | "{}" | "") {
+                    if let Ok(result) = serde_json::from_str::<Value>(&entry.output) {
+                        if let Some(input) = result.get("input") {
+                            entry.input = shown(input);
+                        }
+                    }
+                }
                 if entry.output.len() > 65536 {
                     let mut at = 65536;
                     while !entry.output.is_char_boundary(at) {
@@ -139,17 +146,28 @@ mod tests {
     }
 
     #[test]
+    fn legacy_execute_result_restores_missing_code_for_the_status_line() {
+        let mut tools = ToolTimeline::default();
+        tools.record(&json!({"type":"tool_started","name":"execute","id":"call"}));
+        tools.record(&json!({"type":"tool_finished","id":"call","output":json!({"name":"execute","input":{"code":"await tools.search({query: 'shell'})"},"output":"ok"}).to_string()}));
+        assert_eq!(
+            tools.status(0).as_deref(),
+            Some("已完成 · execute · search · \"shell\"")
+        );
+    }
+
+    #[test]
     fn live_and_completed_actions_keep_their_arguments_in_the_summary() {
         let mut tools = ToolTimeline::default();
         tools.record(&json!({"payload":{"type":"agent.tool.started","content":json!({"name":"find","call_id":"one","arguments":{"target":"history","query":"部署"}}).to_string()}}));
         assert_eq!(
             tools.status(0).as_deref(),
-            Some("执行中 · find · 历史 · 部署")
+            Some("执行中 · find · history : \"部署\"")
         );
         tools.record(&json!({"type":"tool_finished","call_id":"one","output":"done"}));
         assert_eq!(
             tools.status(0).as_deref(),
-            Some("已完成 · find · 历史 · 部署")
+            Some("已完成 · find · history : \"部署\"")
         );
         tools.record(&json!({"type":"tool_started","name":"shell","call_id":"two","input":{"command":"ls -la src"}}));
         assert_eq!(

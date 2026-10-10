@@ -10,28 +10,36 @@ pub(super) fn summary(name: &str, input: &Value) -> String {
     let name = clean(name);
     let name = if name.is_empty() { "tool" } else { &name };
     let action = match name {
-        "shell" => command_preview(input["command"].as_str().unwrap_or_default()),
-        "find" => {
+        "execute" if input["code"].is_string() => {
+            super::tool_code_preview::call(input["code"].as_str().unwrap())
+                .map(|(tool, arguments)| summary(&tool, &arguments))
+                .unwrap_or_else(|| "代码执行".into())
+        }
+        "shell" | "execute" | "exec_command" | "bash" | "Bash" | "command_execution" => {
+            let command = input["command"].as_str().or_else(|| input["cmd"].as_str());
+            match command {
+                Some(command) => command_preview(command),
+                None => match input["action"].as_str() {
+                    Some("read") => "读取进程输出".into(),
+                    Some("write") => "发送进程输入".into(),
+                    Some("stop") => "停止进程".into(),
+                    _ => String::new(),
+                },
+            }
+        }
+        "find" | "search" => {
             let target = clean(input["target"].as_str().unwrap_or_default()).to_lowercase();
-            let label = match target.as_str() {
-                "tool" | "tools" => "工具",
-                "skill" | "skills" => "Skill",
-                "history" | "chat" => "历史",
-                "doc" | "docs" => "文档",
-                _ => "资源",
-            };
             let subject = ["id", "name", "query"]
                 .iter()
                 .map(|key| clean(input[*key].as_str().unwrap_or_default()))
                 .find(|s| !s.is_empty());
-            format!(
-                "{label} · {}",
-                subject.as_deref().unwrap_or(if label == "历史" {
-                    "最近记录"
-                } else {
-                    "列表"
-                })
-            )
+            match (target.is_empty(), subject) {
+                (true, Some(subject)) => serde_json::to_string(&subject).unwrap(),
+                (false, Some(subject)) => {
+                    format!("{target} : {}", serde_json::to_string(&subject).unwrap())
+                }
+                (_, None) => target,
+            }
         }
         _ => String::new(),
     };

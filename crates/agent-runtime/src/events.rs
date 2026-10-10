@@ -22,6 +22,8 @@ pub enum RuntimeEvent {
     ToolStarted {
         id: String,
         name: String,
+        #[serde(default)]
+        arguments: serde_json::Value,
     },
     ToolFinished {
         id: String,
@@ -110,7 +112,8 @@ mod tests {
         assert_eq!(
             RuntimeEvent::ToolStarted {
                 id: "a".into(),
-                name: "read".into()
+                name: "read".into(),
+                arguments: json!({"path":"README.md"})
             }
             .wire_progress()
             .unwrap()
